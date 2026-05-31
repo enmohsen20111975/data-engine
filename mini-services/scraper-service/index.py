@@ -343,7 +343,7 @@ function clearData() {
 }
 
 refresh();
-setInterval(refresh, 1500);
+setInterval(refresh, 5000);
 </script>
 </body>
 </html>'''
