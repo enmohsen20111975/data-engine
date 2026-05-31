@@ -208,8 +208,16 @@ def fetch_historical_from_yahoo(symbol, exchange, period='1y'):
     except Exception as e:
         return None, str(e)
 
-def update_historical_data(stocks=None, period='2y'):
-    """تحديث البيانات التاريخية"""
+def update_historical_data(stocks=None, period='5y'):
+    """تحديث البيانات التاريخية
+    
+    الفترات المتاحة:
+    - '1y': سنة واحدة
+    - '2y': سنتين
+    - '5y': 5 سنين (default)
+    - '10y': 10 سنين
+    - 'max': كل البيانات المتاحة
+    """
     if stocks is None:
         stocks = get_all_stocks()
 
@@ -420,6 +428,8 @@ def main():
     parser.add_argument('--historical-only', action='store_true', help='تحديث البيانات التاريخية بس')
     parser.add_argument('--icons-only', action='store_true', help='تحميل الأيقونات بس')
     parser.add_argument('--exchange', type=str, help='تحديث بورصة معينة فقط')
+    parser.add_argument('--period', type=str, default='5y', 
+                        help='فترة البيانات التاريخية: 1y, 2y, 5y, 10y, max (default: 5y)')
 
     args = parser.parse_args()
 
@@ -438,13 +448,13 @@ def main():
     elif args.stocks_only:
         update_stock_prices(stocks)
     elif args.historical_only:
-        update_historical_data(stocks)
+        update_historical_data(stocks, period=args.period)
     elif args.icons_only:
         download_all_icons(stocks)
     else:
         # تشغيل كل العمليات
         update_stock_prices(stocks)
-        update_historical_data(stocks)
+        update_historical_data(stocks, period=args.period)
         download_all_icons(stocks)
 
     print(f"\n{'='*60}")
