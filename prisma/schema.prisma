@@ -20,10 +20,10 @@ model Stock {
   nameEn        String?  // الاسم بالإنجليزية
   urlSlug       String?  // جزء الرابط مثل arab-cotton-gi
   exchange      String   // البورصة مثل EGX, TADAWUL
+  country       String?  // الدولة
   isin          String?  // رقم ISIN الدولي
   sector        String?  // القطاع
   industry      String?  // الصناعة
-  country       String?  // الدولة
   currency      String?  // عملة التداول
   description   String?  // وصف الشركة
   website       String?  // الموقع الإلكتروني
