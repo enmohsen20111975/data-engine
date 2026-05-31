@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import path from 'path';
 
 const execAsync = promisify(exec);
 
-// Use process.cwd() to get the project root directory dynamically
-const PROJECT_ROOT = process.cwd();
-const SCRAPER_PATH = path.join(PROJECT_ROOT, 'mini-services', 'scraper-service', 'backend.py');
-const PYTHON_PATH = path.join(PROJECT_ROOT, 'mini-services', 'scraper-service', 'venv', 'bin', 'python');
+// Get paths from environment variables or use defaults
+// These are resolved at RUNTIME, not build time
+const getPythonPath = () => process.env.PYTHON_PATH || 'python3';
+const getScraperPath = () => process.env.SCRAPER_PATH || '';
 
 // Exchange to country mapping
 const EXCHANGE_COUNTRY_MAP: Record<string, string> = {
@@ -25,6 +24,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action, period } = body;
     
+    // Resolve paths at runtime
+    const projectRoot = process.cwd();
+    const scraperPath = getScraperPath() || `${projectRoot}/mini-services/scraper-service/backend.py`;
+    const pythonPath = getPythonPath();
+    
     let command = '';
     let message = '';
     
@@ -33,35 +37,35 @@ export async function POST(request: NextRequest) {
     
     switch (action) {
       case 'prices':
-        command = `${PYTHON_PATH} ${SCRAPER_PATH} --stocks-only`;
+        command = `${pythonPath} ${scraperPath} --stocks-only`;
         message = 'تحديث الأسعار';
         break;
       case 'historical':
-        command = `${PYTHON_PATH} ${SCRAPER_PATH} --historical-only ${periodFlag}`;
+        command = `${pythonPath} ${scraperPath} --historical-only ${periodFlag}`;
         message = `جلب البيانات التاريخية (${period || '5 سنين'})`;
         break;
       case 'icons':
-        command = `${PYTHON_PATH} ${SCRAPER_PATH} --icons-only`;
+        command = `${pythonPath} ${scraperPath} --icons-only`;
         message = 'تحميل الأيقونات';
         break;
       case 'all':
-        command = `${PYTHON_PATH} ${SCRAPER_PATH} ${periodFlag}`;
+        command = `${pythonPath} ${scraperPath} ${periodFlag}`;
         message = 'تحديث شامل';
         break;
       case 'parallel_ksa_egx':
-        runParallelTasks(['KSA', 'EGX'], period);
+        runParallelTasks(['KSA', 'EGX'], period, pythonPath, scraperPath);
         return NextResponse.json({
           success: true,
           message: `بدء المعالجة المتوازية للسعودية ومصر...`
         });
       case 'parallel_kse_qe':
-        runParallelTasks(['KSE', 'QE'], period);
+        runParallelTasks(['KSE', 'QE'], period, pythonPath, scraperPath);
         return NextResponse.json({
           success: true,
           message: `بدء المعالجة المتوازية للكويت وقطر...`
         });
       case 'parallel_uae_bah':
-        runParallelTasks(['UAE', 'BAH'], period);
+        runParallelTasks(['UAE', 'BAH'], period, pythonPath, scraperPath);
         return NextResponse.json({
           success: true,
           message: `بدء المعالجة المتوازية للإمارات والبحرين...`
@@ -96,10 +100,10 @@ export async function POST(request: NextRequest) {
 }
 
 // Run parallel tasks for multiple exchanges
-async function runParallelTasks(exchanges: string[], period?: string) {
+async function runParallelTasks(exchanges: string[], period: string | undefined, pythonPath: string, scraperPath: string) {
   const exchangeFlags = exchanges.map(ex => `--exchange=${ex}`).join(' ');
   const periodFlag = period ? `--period=${period}` : '--period=5y';
-  const command = `${PYTHON_PATH} ${SCRAPER_PATH} ${exchangeFlags} ${periodFlag}`;
+  const command = `${pythonPath} ${scraperPath} ${exchangeFlags} ${periodFlag}`;
   
   execAsync(command, {
     timeout: 600000,

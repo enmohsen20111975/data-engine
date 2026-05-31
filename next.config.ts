@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  // Exclude mini-services from the build
+  experimental: {
+    outputFileTracingExcludes: {
+      '*': ['mini-services/**/*', 'venv/**/*'],
+    },
+  },
 };
 
 export default nextConfig;
