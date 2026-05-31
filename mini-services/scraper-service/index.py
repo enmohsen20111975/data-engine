@@ -55,10 +55,13 @@ def log(msg, level='info'):
 
 def run_js(js, timeout=30):
     try:
-        escaped = js.replace("'", "'\"'\"'")
-        cmd = f"agent-browser eval '{escaped}'"
+        # Use base64 to avoid escaping issues
+        import base64
+        encoded = base64.b64encode(js.encode()).decode()
+        cmd = f"agent-browser eval --base64 '{encoded}'"
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
         output = result.stdout.strip()
+        # Remove surrounding quotes if present
         if output.startswith('"') and output.endswith('"'):
             output = output[1:-1]
         return output
