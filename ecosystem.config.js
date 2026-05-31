@@ -23,7 +23,7 @@ module.exports = {
       watch: false,
       autorestart: true,
       max_restarts: 10,
-      interpreter: './venv/bin/python',
+      interpreter: 'venv/bin/python',
       env: {
         PYTHONUNBUFFERED: '1'
       }
