@@ -491,9 +491,8 @@ def scrape_exchange(exchange):
 
         state['total'] = total
 
-        # Extract stocks
-        stocks_json = run_js("""
-(function(){
+        # Extract stocks - use raw string to preserve \n
+        js_code = r'''(function(){
   const tbl = document.querySelectorAll('table')[1];
   const trs = tbl?.querySelectorAll('tr') || [];
   const items = [];
@@ -502,13 +501,13 @@ def scrape_exchange(exchange):
     if(cells.length >= 2) {
       const link = cells[0].querySelector('a');
       const txt = cells[0].innerText || '';
-      const parts = txt.split('\\n');
-      items.push(JSON.stringify({sym:parts[0]||'',name:parts[1]||'',href:link?.href||'',price:cells[1]?.innerText||''}));
+      const lines = txt.split('\n');
+      items.push(JSON.stringify({sym:lines[0]||'',name:lines[1]||'',href:link?.href||'',price:cells[1]?.innerText||''}));
     }
   }
   return items.join('|||');
-})()
-""", timeout=60)
+})()'''
+        stocks_json = run_js(js_code, timeout=60)
 
         stocks = []
         for item in stocks_json.split('|||'):
