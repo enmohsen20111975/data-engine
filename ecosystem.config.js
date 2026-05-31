@@ -14,16 +14,19 @@ module.exports = {
         PORT: 3000
       }
     },
-    // Python Backend (Scraper)
+    // Python Backend (Scraper) - using venv
     {
       name: 'data-engine-backend',
-      script: 'python3',
-      args: 'backend.py --schedule',
+      script: 'backend.py',
+      args: '--schedule',
       cwd: './mini-services/scraper-service',
       watch: false,
       autorestart: true,
       max_restarts: 10,
-      interpreter: 'python3'
+      interpreter: './venv/bin/python',
+      env: {
+        PYTHONUNBUFFERED: '1'
+      }
     }
   ]
 };
