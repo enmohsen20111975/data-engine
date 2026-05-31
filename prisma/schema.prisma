@@ -1,5 +1,5 @@
-// Data Factory - TradingView & Investing.com Scraper
-// Complete Stock Data Mining System
+// Data Engine - Prisma Schema
+// مطابق لقاعدة البيانات الفعلية
 
 generator client {
   provider = "prisma-client-js"
@@ -15,36 +15,26 @@ datasource db {
 // =============================================================================
 model Stock {
   id            String   @id @default(cuid())
-  symbol        String   @unique // رمز السهم مثل COMI, ACGC
-  nameAr        String?  // الاسم بالعربية
-  nameEn        String?  // الاسم بالإنجليزية
-  urlSlug       String?  // جزء الرابط مثل arab-cotton-gi
-  exchange      String   // البورصة مثل EGX, TADAWUL
-  country       String?  // الدولة
-  isin          String?  // رقم ISIN الدولي
-  sector        String?  // القطاع
-  industry      String?  // الصناعة
-  currency      String?  // عملة التداول
-  description   String?  // وصف الشركة
-  website       String?  // الموقع الإلكتروني
-  employees     Int?     // عدد الموظفين
-  founded       Int?     // سنة التأسيس
-  logo          String?  // رابط الشعار
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  symbol        String   @unique
+  nameAr        String?
+  nameEn        String?
+  exchange      String
+  urlSlug       String?
+  sector        String?
+  industry      String?
+  website       String?
+  headquarters  String?
+  foundedYear   Int?
+  description   String?
+  iconUrl       String?
+  isin          String?
+  country       String?
+  createdAt     Int
+  updatedAt     Int
 
   // العلاقات
-  overview        StockOverview?
-  historicalData  HistoricalData[]
-  incomeStatement  IncomeStatement[]
-  balanceSheet     BalanceSheet[]
-  cashFlow         CashFlow[]
-  ratios           FinancialRatio[]
-  dividends        Dividend[]
-  news             StockNews[]
-  forecasts        AnalystForecast?
-  ownership        Ownership?
-  insiders         InsiderHolding[]
+  overview       StockOverview?
+  historicalData HistoricalData[]
 
   @@index([symbol])
   @@index([exchange])
@@ -52,487 +42,59 @@ model Stock {
 }
 
 // =============================================================================
-// نظرة عامة على السهم (الأسعار والقيم الأساسية)
+// نظرة عامة على السهم
 // =============================================================================
 model StockOverview {
-  id                    String   @id @default(cuid())
-  stockId               String   @unique
+  id               String  @id @default(cuid())
+  stockId          String  @unique
   
-  // الأسعار
-  currentPrice          Float?   // السعر الحالي
-  previousClose         Float?   // إغلاق سابق
-  open                  Float?   // فتح اليوم
-  dayHigh               Float?   // أعلى سعر اليوم
-  dayLow                Float?   // أقل سعر اليوم
-  week52High            Float?   // أعلى سعر في 52 أسبوع
-  week52Low             Float?   // أقل سعر في 52 أسبوع
-  
-  // القيم
-  marketCap             Float?   // القيمة السوقية
-  enterpriseValue       Float?   // قيمة المؤسسة
-  peRatio               Float?   // مكرر الربحية
-  pegRatio              Float?   // نسبة النمو
-  priceToBook           Float?   // سعر إلى القيمة الدفترية
-  priceToSales          Float?   // سعر إلى المبيعات
-  evToEbitda            Float?   // EV to EBITDA
-  
-  // الربحية
-  eps                   Float?   // ربحية السهم
-  revenuePerShare       Float?   // الإيراد لكل سهم
-  profitMargin          Float?   // هامش الربح
-  operatingMargin       Float?   // هامش التشغيل
-  
-  // التوزيعات
-  dividendYield         Float?   // عائد التوزيعات
-  dividendRate          Float?   // معدل التوزيع
-  payoutRatio           Float?   // نسبة التوزيع
-  exDividendDate        DateTime? // تاريخ الاستحقاق
-  
-  // التداول
-  volume                Float?   // حجم التداول
-  avgVolume             Float?   // متوسط الحجم
-  beta                  Float?   // معامل بيتا
-  sharesOutstanding     Float?   // الأسهم القائمة
-  floatShares           Float?   // الأسهم الحرة
-  
-  // معلومات إضافية
-  change                Float?   // التغير
-  changePercent         Float?   // نسبة التغير
-  lastUpdate            DateTime? // آخر تحديث
-  rawData               String?  // JSON للبيانات الإضافية
-  
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  currentPrice     Float?
+  changeAmount     Float?
+  changePercent    Float?
+  marketCap        Float?
+  enterpriseValue  Float?
+  peRatioTTM       Float?
+  peRatioFwd       Float?
+  epsTTM           Float?
+  eps              Float?
+  dividendYield    Float?
+  dividendRate     Float?
+  beta             Float?
+  sharesOutstanding Float?
+  floatShares      Float?
+  avgVolume        Float?
+  dayHigh          Float?
+  dayLow           Float?
+  yearHigh         Float?
+  yearLow          Float?
+  fiftyDayMA       Float?
+  twoHundredDayMA  Float?
+  revenueFY        Float?
+  netIncomeFY      Float?
+  employees        Int?
+  createdAt        String
+  updatedAt        String
 
   stock Stock @relation(fields: [stockId], references: [id], onDelete: Cascade)
 }
 
 // =============================================================================
-// البيانات التاريخية اليومية (من 2010)
+// البيانات التاريخية اليومية
 // =============================================================================
 model HistoricalData {
-  id          String   @id @default(cuid())
-  stockId     String
-  date        DateTime // تاريخ التداول
-  open        Float    // سعر الفتح
-  high        Float    // أعلى سعر
-  low         Float    // أقل سعر
-  close       Float    // سعر الإغلاق
-  adjClose    Float?   // سعر الإغلاق المعدل
-  volume      Float    // حجم التداول
-  change      Float?   // التغير
-  changePercent Float? // نسبة التغير
-  vwap        Float?   // متوسط السعر المرجح
-  createdAt   DateTime @default(now())
+  id            String  @id @default(cuid())
+  stockId       String
+  date          String
+  open          Float?
+  high          Float?
+  low           Float?
+  close         Float?
+  adjustedClose Float?
+  volume        Float?
+  createdAt     String
 
   stock Stock @relation(fields: [stockId], references: [id], onDelete: Cascade)
 
   @@unique([stockId, date])
   @@index([stockId, date])
-}
-
-// =============================================================================
-// قائمة الدخل (سنوية وربع سنوية)
-// =============================================================================
-model IncomeStatement {
-  id                String   @id @default(cuid())
-  stockId           String
-  period            String   // الفترة مثل Q1 2024, FY 2023
-  periodType        String   @default("annual") // annual, quarterly
-  
-  // الإيرادات
-  revenue           Float?   // إجمالي الإيرادات
-  costOfRevenue     Float?   // تكلفة الإيرادات
-  grossProfit       Float?   // إجمالي الربح
-  
-  // مصاريف التشغيل
-  operatingExpenses Float?   // مصاريف التشغيل
-  sellingAdmin      Float?   // مصاريف البيع والإدارة
-  rdExpenses        Float?   // مصاريف البحث والتطوير
-  depreciation      Float?   // الإهلاك
-  
-  // الأرباح
-  operatingIncome   Float?   // دخل التشغيل
-  ebit              Float?   // EBIT
-  ebitda            Float?   // EBITDA
-  interestExpense   Float?   // مصاريف الفائدة
-  otherIncome       Float?   // إيرادات أخرى
-  
-  // الضرائب والصافي
-  incomeBeforeTax   Float?   // الدخل قبل الضرائب
-  incomeTax         Float?   // الضرائب
-  netIncome         Float?   // صافي الربح
-  
-  // للسهم
-  eps               Float?   // ربحية السهم
-  epsDiluted        Float?   // ربحية السهم المخففة
-  
-  // تاريخ التقرير
-  reportDate        DateTime?
-  rawData           String?  // JSON للبيانات الإضافية
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  stock Stock @relation(fields: [stockId], references: [id], onDelete: Cascade)
-
-  @@unique([stockId, period, periodType])
-  @@index([stockId])
-}
-
-// =============================================================================
-// الميزانية العمومية
-// =============================================================================
-model BalanceSheet {
-  id                String   @id @default(cuid())
-  stockId           String
-  period            String
-  periodType        String   @default("annual")
-  
-  // الأصول المتداولة
-  cash              Float?   // النقد
-  cashEquivalents   Float?   // المكافئات النقدية
-  shortInvestments  Float?   // استثمارات قصيرة الأجل
-  receivables       Float?   // الذمم المدينة
-  inventory         Float?   // المخزون
-  otherCurrentAssets Float?  // أصول متداولة أخرى
-  totalCurrentAssets Float?  // إجمالي الأصول المتداولة
-  
-  // الأصول الثابتة
-  propertyPlant     Float?   // العقارات والآلات
-  goodwill          Float?   // الشهرة
-  intangibles       Float?   // الأصول غير الملموسة
-  longInvestments   Float?   // استثمارات طويلة الأجل
-  otherAssets       Float?   // أصول أخرى
-  totalAssets       Float?   // إجمالي الأصول
-  
-  // الخصوم المتداولة
-  accountsPayable   Float?   // الذمم الدائنة
-  shortDebt         Float?   // ديون قصيرة الأجل
-  otherCurrentLiab  Float?   // خصوم متداولة أخرى
-  totalCurrentLiab  Float?   // إجمالي الخصوم المتداولة
-  
-  // الخصوم طويلة الأجل
-  longDebt          Float?   // ديون طويلة الأجل
-  otherLiab         Float?   // خصوم أخرى
-  totalLiabilities  Float?   // إجمالي الخصوم
-  
-  // حقوق المساهمين
-  commonStock       Float?   // رأس المال
-  retainedEarnings  Float?   // الأرباح المحتجزة
-  treasuryStock     Float?   // أسهم الخزينة
-  otherEquity       Float?   // حقوق أخرى
-  totalEquity       Float?   // إجمالي حقوق المساهمين
-  
-  reportDate        DateTime?
-  rawData           String?
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  stock Stock @relation(fields: [stockId], references: [id], onDelete: Cascade)
-
-  @@unique([stockId, period, periodType])
-  @@index([stockId])
-}
-
-// =============================================================================
-// قائمة التدفقات النقدية
-// =============================================================================
-model CashFlow {
-  id                  String   @id @default(cuid())
-  stockId             String
-  period              String
-  periodType          String   @default("annual")
-  
-  // أنشطة التشغيل
-  netIncome           Float?   // صافي الربح
-  depreciation        Float?   // الإهلاك
-  workingCapital      Float?   // التغير في رأس المال العامل
-  otherOperating      Float?   // أنشطة تشغيل أخرى
-  operatingCashFlow   Float?   // صافي التدفقات من التشغيل
-  
-  // أنشطة الاستثمار
-  capitalExpenditure  Float?   // الإنفاق الرأسمالي
-  acquisitions        Float?   // الاستحواذات
-  investments         Float?   // الاستثمارات
-  otherInvesting      Float?   // أنشطة استثمار أخرى
-  investingCashFlow   Float?   // صافي التدفقات من الاستثمار
-  
-  // أنشطة التمويل
-  debtIssued          Float?   // إصدار الديون
-  debtRepaid          Float?   // سداد الديون
-  stockIssued         Float?   // إصدار الأسهم
-  stockRepurchased    Float?   // إعادة شراء الأسهم
-  dividendsPaid       Float?   // التوزيعات المدفوعة
-  otherFinancing      Float?   // أنشطة تمويل أخرى
-  financingCashFlow   Float?   // صافي التدفقات من التمويل
-  
-  // الصافي
-  netChange           Float?   // التغير الصافي
-  freeCashFlow        Float?   // التدفق النقدي الحر
-  
-  reportDate          DateTime?
-  rawData             String?
-  
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  stock Stock @relation(fields: [stockId], references: [id], onDelete: Cascade)
-
-  @@unique([stockId, period, periodType])
-  @@index([stockId])
-}
-
-// =============================================================================
-// النسب المالية والتحليلية
-// =============================================================================
-model FinancialRatio {
-  id              String   @id @default(cuid())
-  stockId         String
-  period          String
-  periodType      String   @default("annual")
-  
-  // نسب الربحية
-  grossMargin     Float?   // هامش إجمالي الربح
-  operatingMargin Float?   // هامش التشغيل
-  netMargin       Float?   // هامش صافي الربح
-  roe             Float?   // العائد على حقوق المساهمين
-  roa             Float?   // العائد على الأصول
-  roic            Float?   // العائد على رأس المال المستثمر
-  
-  // نسب السيولة
-  currentRatio    Float?   // نسبة التداول
-  quickRatio      Float?   // نسبة السيولة السريعة
-  cashRatio       Float?   // نسبة النقد
-  
-  // نسب الرفع
-  debtToEquity    Float?   // الديون إلى حقوق المساهمين
-  debtToAssets    Float?   // الديون إلى الأصول
-  interestCoverage Float?  // تغطية الفائدة
-  
-  // نسب الكفاءة
-  assetTurnover   Float?   // دوران الأصول
-  inventoryTurnover Float? // دوران المخزون
-  receivablesTurnover Float? // دوران الذمم المدينة
-  
-  // نسب القيمة
-  peRatio         Float?   // مكرر الربحية
-  pbRatio         Float?   // السعر إلى القيمة الدفترية
-  psRatio         Float?   // السعر إلى المبيعات
-  evEbitda        Float?   // EV/EBITDA
-  
-  reportDate      DateTime?
-  rawData         String?
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  stock Stock @relation(fields: [stockId], references: [id], onDelete: Cascade)
-
-  @@unique([stockId, period, periodType])
-  @@index([stockId])
-}
-
-// =============================================================================
-// توزيعات الأرباح
-// =============================================================================
-model Dividend {
-  id              String   @id @default(cuid())
-  stockId         String
-  exDate          DateTime // تاريخ الاستحقاق
-  recordDate      DateTime? // تاريخ التسجيل
-  paymentDate     DateTime? // تاريخ الصرف
-  declareDate     DateTime? // تاريخ الإعلان
-  amount          Float    // قيمة التوزيع
-  currency        String   @default("EGP")
-  dividendType    String?  // نوع التوزيع (نقدي، أسهم)
-  frequency       String?  // التكرار (ربع سنوي، سنوي)
-  yield           Float?   // العائد
-  
-  createdAt       DateTime @default(now())
-
-  stock Stock @relation(fields: [stockId], references: [id], onDelete: Cascade)
-
-  @@unique([stockId, exDate])
-  @@index([stockId, exDate])
-}
-
-// =============================================================================
-// أخبار السهم
-// =============================================================================
-model StockNews {
-  id          String   @id @default(cuid())
-  stockId     String
-  title       String
-  summary     String?  // ملخص الخبر
-  content     String?  // المحتوى الكامل
-  source      String?  // المصدر
-  newsUrl     String?  // رابط الخبر
-  imageUrl    String?  // صورة
-  category    String?  // التصنيف
-  sentiment   String?  // تحليل المشاعر (positive, negative, neutral)
-  newsDate    DateTime // تاريخ الخبر
-  createdAt   DateTime @default(now())
-
-  stock Stock @relation(fields: [stockId], references: [id], onDelete: Cascade)
-
-  @@index([stockId, newsDate])
-}
-
-// =============================================================================
-// توقعات المحللين
-// =============================================================================
-model AnalystForecast {
-  id                String   @id @default(cuid())
-  stockId           String   @unique
-  
-  // توقعات السعر
-  targetPrice       Float?   // السعر المستهدف
-  targetHigh        Float?   // أعلى سعر متوقع
-  targetLow         Float?   // أقل سعر متوقع
-  medianTarget      Float?   // الوسيط
-  
-  // التوصيات
-  recommendation    String?  // التوصية (buy, sell, hold)
-  strongBuy         Int?     // عدد توصيات الشراء القوي
-  buy               Int?     // عدد توصيات الشراء
-  hold              Int?     // عدد توصيات الانتظار
-  sell              Int?     // عدد توصيات البيع
-  strongSell        Int?     // عدد توصيات البيع القوي
-  totalAnalysts     Int?     // إجمالي المحللين
-  
-  // توقعات الأرباح
-  epsCurrentYear    Float?   // ربحية السهم للسنة الحالية
-  epsNextYear       Float?   // ربحية السهم للسنة القادمة
-  epsNextQuarter    Float?   // ربحية السهم للربع القادم
-  
-  // توقعات الإيرادات
-  revenueCurrentYear Float?  // الإيرادات للسنة الحالية
-  revenueNextYear   Float?   // الإيرادات للسنة القادمة
-  
-  lastUpdate        DateTime?
-  rawData           String?
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  stock Stock @relation(fields: [stockId], references: [id], onDelete: Cascade)
-}
-
-// =============================================================================
-// هيكل الملكية
-// =============================================================================
-model Ownership {
-  id              String   @id @default(cuid())
-  stockId         String   @unique
-  
-  // الملكية
-  institutional   Float?   // نسبة تملك المؤسسات
-  mutualFunds     Float?   // نسبة تملك الصناديق
-  insiders        Float?   // نسبة تملك المطلعين
-  public          Float?   // نسبة تملك العامة
-  
-  // أعلى المساهمين (JSON)
-  topHolders      String?  // أكبر المساهمين
-  
-  lastUpdate      DateTime?
-  rawData         String?
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  stock Stock @relation(fields: [stockId], references: [id], onDelete: Cascade)
-}
-
-// =============================================================================
-// تملك المطلعين (Insiders)
-// =============================================================================
-model InsiderHolding {
-  id              String   @id @default(cuid())
-  stockId         String
-  
-  name            String   // اسم المطلع
-  title           String?  // المنصب
-  shares          Float?   // عدد الأسهم
-  percentHeld     Float?   // النسبة المئوية
-  lastTransaction DateTime? // آخر معاملة
-  transactionType String?  // نوع المعاملة (buy, sell)
-  
-  createdAt       DateTime @default(now())
-
-  stock Stock @relation(fields: [stockId], references: [id], onDelete: Cascade)
-
-  @@index([stockId])
-}
-
-// =============================================================================
-// سجل الملفات المستوردة
-// =============================================================================
-model ImportedFile {
-  id              String   @id @default(cuid())
-  fileName        String
-  fileType        String   // historical, financial-summary, etc.
-  stockSymbol     String
-  recordsImported Int
-  status          String   // success, partial, failed
-  errorMsg        String?
-  createdAt       DateTime @default(now())
-
-  @@index([stockSymbol])
-  @@index([createdAt])
-}
-
-// =============================================================================
-// جدول مهام الـ Scraping
-// =============================================================================
-model ScrapeJob {
-  id              String   @id @default(cuid())
-  country         String
-  exchange        String
-  status          String   @default("pending")
-  progress        Float    @default(0)
-  currentStage    String?
-  currentStock    String?
-  totalStocks     Int      @default(0)
-  processedStocks Int      @default(0)
-  failedStocks    Int      @default(0)
-  
-  // أنواع البيانات المطلوبة
-  fetchOverview     Boolean @default(true)
-  fetchHistorical   Boolean @default(true)
-  fetchFinancials   Boolean @default(true)
-  fetchDividends    Boolean @default(true)
-  fetchForecasts    Boolean @default(true)
-  fetchOwnership    Boolean @default(true)
-  
-  // النطاق الزمني
-  startDate       String?  // من تاريخ (للبيانات التاريخية)
-  endDate         String?  // إلى تاريخ
-  
-  startedAt       DateTime?
-  completedAt     DateTime?
-  errorMsg        String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([status])
-  @@index([country])
-  @@index([exchange])
-}
-
-// =============================================================================
-// سجل تفاصيل الـ Scraping
-// =============================================================================
-model ScrapeLog {
-  id          String   @id @default(cuid())
-  jobId       String
-  stockSymbol String?
-  action      String
-  message     String
-  details     String?
-  createdAt   DateTime @default(now())
-
-  @@index([jobId])
-  @@index([createdAt])
 }
