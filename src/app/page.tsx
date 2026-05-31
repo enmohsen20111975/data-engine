@@ -11,6 +11,33 @@ interface Stock {
   exchange: string;
   country: string | null;
   sector: string | null;
+  industry: string | null;
+  iconUrl: string | null;
+  website: string | null;
+  headquarters: string | null;
+  foundedYear: number | null;
+  description: string | null;
+  isin: string | null;
+}
+
+interface StockOverview {
+  currentPrice: number | null;
+  changeAmount: number | null;
+  changePercent: number | null;
+  marketCap: number | null;
+  peRatioTTM: number | null;
+  epsTTM: number | null;
+  dividendYield: number | null;
+  employees: number | null;
+}
+
+interface HistoricalRecord {
+  date: string;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number | null;
+  volume: number | null;
 }
 
 interface HistoricalSummary {
@@ -26,6 +53,7 @@ interface Stats {
   totalStocks: number;
   historicalCount: number;
   stocksByExchange: { exchange: string; count: number }[];
+  iconsCount?: number;
 }
 
 interface LogEntry {
@@ -46,6 +74,15 @@ export default function DataFactory() {
   const [taskRunning, setTaskRunning] = useState(false);
   const [currentTask, setCurrentTask] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  
+  // Stock detail modal
+  const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
+  const [stockOverview, setStockOverview] = useState<StockOverview | null>(null);
+  const [stockHistorical, setStockHistorical] = useState<HistoricalRecord[]>([]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  
+  // Icons count
+  const [iconsCount, setIconsCount] = useState(0);
 
   // Add log
   const log = useCallback((type: LogEntry['type'], message: string) => {
@@ -64,11 +101,11 @@ export default function DataFactory() {
     }
   }, [log]);
 
-  // Fetch stocks
+  // Fetch ALL stocks (no limit)
   const fetchStocks = useCallback(async () => {
     try {
       log('info', 'جاري تحميل قائمة الأسهم...');
-      const res = await fetch('/api/stocks?limit=100');
+      const res = await fetch('/api/stocks?limit=1000'); // Fetch all stocks
       if (res.ok) {
         const data = await res.json();
         setStocks(data);
@@ -83,11 +120,11 @@ export default function DataFactory() {
     }
   }, [log]);
 
-  // Fetch historical
+  // Fetch all historical data
   const fetchHistorical = useCallback(async () => {
     try {
       log('info', 'جاري تحميل البيانات التاريخية...');
-      const res = await fetch('/api/historical?limit=30');
+      const res = await fetch('/api/historical?limit=1000');
       if (res.ok) {
         const data = await res.json();
         setHistoricalData(data);
@@ -97,6 +134,50 @@ export default function DataFactory() {
       log('error', 'فشل تحميل البيانات التاريخية');
     }
   }, [log]);
+
+  // Fetch stock details
+  const fetchStockDetail = async (stock: Stock) => {
+    setSelectedStock(stock);
+    setLoadingDetail(true);
+    setStockOverview(null);
+    setStockHistorical([]);
+    
+    try {
+      // Fetch overview
+      const overviewRes = await fetch(`/api/stocks/${stock.symbol}/overview`);
+      if (overviewRes.ok) {
+        const overviewData = await overviewRes.json();
+        setStockOverview(overviewData);
+      }
+      
+      // Fetch historical
+      const histRes = await fetch(`/api/stocks/${stock.symbol}/historical?limit=30`);
+      if (histRes.ok) {
+        const histData = await histRes.json();
+        setStockHistorical(histData);
+      }
+    } catch (e) {
+      log('error', `فشل تحميل تفاصيل ${stock.symbol}`);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  // Count icons
+  useEffect(() => {
+    const countIcons = async () => {
+      try {
+        const res = await fetch('/api/icons/count');
+        if (res.ok) {
+          const data = await res.json();
+          setIconsCount(data.count || 0);
+        }
+      } catch (e) {
+        // Ignore
+      }
+    };
+    countIcons();
+  }, []);
 
   // Initial load
   useEffect(() => {
@@ -204,6 +285,159 @@ export default function DataFactory() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white" dir="rtl">
+      {/* Stock Detail Modal */}
+      {selectedStock && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setSelectedStock(null)}>
+          <div className="bg-slate-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="bg-slate-700 p-4 flex items-center gap-4 sticky top-0">
+              {selectedStock.iconUrl && (
+                <img src={selectedStock.iconUrl} alt={selectedStock.symbol} className="w-12 h-12 rounded" />
+              )}
+              <div className="flex-1">
+                <h2 className="text-xl font-bold">{selectedStock.symbol}</h2>
+                <p className="text-slate-300">{selectedStock.nameAr || selectedStock.nameEn || '—'}</p>
+              </div>
+              <button onClick={() => setSelectedStock(null)} className="text-slate-400 hover:text-white text-2xl">✕</button>
+            </div>
+            
+            {loadingDetail ? (
+              <div className="p-8 text-center">
+                <div className="text-4xl animate-spin">⚙️</div>
+                <p className="mt-2">جاري تحميل التفاصيل...</p>
+              </div>
+            ) : (
+              <div className="p-4 space-y-6">
+                {/* Basic Info */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="bg-slate-700 rounded p-3">
+                    <div className="text-slate-400 text-sm">البورصة</div>
+                    <div className="font-bold">{exNames[selectedStock.exchange] || selectedStock.exchange}</div>
+                  </div>
+                  <div className="bg-slate-700 rounded p-3">
+                    <div className="text-slate-400 text-sm">البلد</div>
+                    <div className="font-bold">{selectedStock.country || '—'}</div>
+                  </div>
+                  <div className="bg-slate-700 rounded p-3">
+                    <div className="text-slate-400 text-sm">القطاع</div>
+                    <div className="font-bold">{selectedStock.sector || '—'}</div>
+                  </div>
+                  <div className="bg-slate-700 rounded p-3">
+                    <div className="text-slate-400 text-sm">الصناعة</div>
+                    <div className="font-bold">{selectedStock.industry || '—'}</div>
+                  </div>
+                </div>
+
+                {/* Overview */}
+                {stockOverview && (
+                  <div className="bg-slate-700 rounded-lg p-4">
+                    <h3 className="font-bold mb-3 text-emerald-400">📊 نظرة عامة</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div>
+                        <div className="text-slate-400 text-sm">السعر الحالي</div>
+                        <div className="text-xl font-bold text-emerald-400">
+                          {stockOverview.currentPrice?.toLocaleString() || '—'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400 text-sm">التغير</div>
+                        <div className={`font-bold ${stockOverview.changePercent && stockOverview.changePercent > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {stockOverview.changePercent?.toFixed(2)}%
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400 text-sm">القيمة السوقية</div>
+                        <div className="font-bold">{stockOverview.marketCap ? (stockOverview.marketCap / 1e9).toFixed(2) + 'B' : '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400 text-sm">P/E</div>
+                        <div className="font-bold">{stockOverview.peRatioTTM?.toFixed(2) || '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400 text-sm">EPS</div>
+                        <div className="font-bold">{stockOverview.epsTTM?.toFixed(2) || '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400 text-sm">عائد التوزيعات</div>
+                        <div className="font-bold">{stockOverview.dividendYield?.toFixed(2) || '—'}%</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400 text-sm">الموظفين</div>
+                        <div className="font-bold">{stockOverview.employees?.toLocaleString() || '—'}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Company Info */}
+                <div className="bg-slate-700 rounded-lg p-4">
+                  <h3 className="font-bold mb-3 text-blue-400">🏢 معلومات الشركة</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-slate-400 text-sm">الموقع الإلكتروني</div>
+                      <div className="font-bold">{selectedStock.website ? (
+                        <a href={`https://${selectedStock.website}`} target="_blank" className="text-cyan-400 hover:underline">{selectedStock.website}</a>
+                      ) : '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-400 text-sm">المقر</div>
+                      <div className="font-bold">{selectedStock.headquarters || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-400 text-sm">سنة التأسيس</div>
+                      <div className="font-bold">{selectedStock.foundedYear || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-400 text-sm">ISIN</div>
+                      <div className="font-bold font-mono text-sm">{selectedStock.isin || '—'}</div>
+                    </div>
+                  </div>
+                  {selectedStock.description && (
+                    <div className="mt-4 pt-4 border-t border-slate-600">
+                      <div className="text-slate-400 text-sm mb-1">الوصف</div>
+                      <p className="text-slate-200">{selectedStock.description}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Historical Chart Data */}
+                {stockHistorical.length > 0 && (
+                  <div className="bg-slate-700 rounded-lg p-4">
+                    <h3 className="font-bold mb-3 text-purple-400">📈 آخر 30 يوم</h3>
+                    <div className="overflow-auto max-h-64">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-600">
+                          <tr>
+                            <th className="p-2 text-right">التاريخ</th>
+                            <th className="p-2 text-right">افتتاح</th>
+                            <th className="p-2 text-right">أعلى</th>
+                            <th className="p-2 text-right">أدنى</th>
+                            <th className="p-2 text-right">إغلاق</th>
+                            <th className="p-2 text-right">حجم</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stockHistorical.slice(0, 30).map((h, i) => (
+                            <tr key={i} className="border-t border-slate-600">
+                              <td className="p-2">{h.date}</td>
+                              <td className="p-2">{h.open?.toFixed(2) || '—'}</td>
+                              <td className="p-2 text-green-400">{h.high?.toFixed(2) || '—'}</td>
+                              <td className="p-2 text-red-400">{h.low?.toFixed(2) || '—'}</td>
+                              <td className="p-2 font-bold">{h.close?.toFixed(2) || '—'}</td>
+                              <td className="p-2 text-slate-400">{h.volume?.toLocaleString() || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-slate-800 border-b border-slate-700 py-4 px-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -247,7 +481,7 @@ export default function DataFactory() {
         {/* Dashboard */}
         {activeTab === 'dashboard' && stats && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div className="bg-slate-800 rounded-lg p-4">
                 <div className="text-3xl font-bold text-emerald-400">{stats.totalStocks}</div>
                 <div className="text-slate-400">سهم</div>
@@ -261,7 +495,11 @@ export default function DataFactory() {
                 <div className="text-slate-400">بورصة</div>
               </div>
               <div className="bg-slate-800 rounded-lg p-4">
-                <div className="text-3xl font-bold text-amber-400">{filteredStocks.length}</div>
+                <div className="text-3xl font-bold text-amber-400">{iconsCount}</div>
+                <div className="text-slate-400">أيقونة</div>
+              </div>
+              <div className="bg-slate-800 rounded-lg p-4">
+                <div className="text-3xl font-bold text-cyan-400">{filteredStocks.length}</div>
                 <div className="text-slate-400">معروض</div>
               </div>
             </div>
@@ -291,6 +529,18 @@ export default function DataFactory() {
         {/* Stocks */}
         {activeTab === 'stocks' && (
           <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div className="text-slate-400">
+                عرض {filteredStocks.length} من {stocks.length} سهم
+              </div>
+              <button 
+                onClick={fetchStocks}
+                className="bg-emerald-600 px-4 py-2 rounded hover:bg-emerald-700"
+              >
+                🔄 تحديث
+              </button>
+            </div>
+
             {stats && (
               <div className="flex flex-wrap gap-2">
                 <button
@@ -313,7 +563,7 @@ export default function DataFactory() {
 
             <input
               type="text"
-              placeholder="بحث..."
+              placeholder="بحث بالرمز أو الاسم..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full md:w-64 px-3 py-2 bg-slate-800 border border-slate-600 rounded focus:border-emerald-500 outline-none"
@@ -324,6 +574,7 @@ export default function DataFactory() {
                 <table className="w-full text-sm">
                   <thead className="bg-slate-700 sticky top-0">
                     <tr>
+                      <th className="p-3 text-right w-12"></th>
                       <th className="p-3 text-right">الرمز</th>
                       <th className="p-3 text-right">الاسم</th>
                       <th className="p-3 text-right">البورصة</th>
@@ -332,7 +583,20 @@ export default function DataFactory() {
                   </thead>
                   <tbody>
                     {filteredStocks.map(s => (
-                      <tr key={s.id} className="border-t border-slate-700 hover:bg-slate-700/50">
+                      <tr 
+                        key={s.id} 
+                        className="border-t border-slate-700 hover:bg-slate-700/50 cursor-pointer"
+                        onClick={() => fetchStockDetail(s)}
+                      >
+                        <td className="p-3">
+                          {s.iconUrl ? (
+                            <img src={s.iconUrl} alt={s.symbol} className="w-8 h-8 rounded" />
+                          ) : (
+                            <div className="w-8 h-8 bg-slate-600 rounded flex items-center justify-center text-xs">
+                              {s.symbol.slice(0, 2)}
+                            </div>
+                          )}
+                        </td>
                         <td className="p-3 text-cyan-400 font-mono">{s.symbol}</td>
                         <td className="p-3">{s.nameAr || s.nameEn || '—'}</td>
                         <td className="p-3 text-purple-400">{exNames[s.exchange] || s.exchange}</td>
@@ -350,7 +614,7 @@ export default function DataFactory() {
         {activeTab === 'historical' && (
           <div className="bg-slate-800 rounded-lg overflow-hidden">
             <div className="p-4 border-b border-slate-700 flex justify-between">
-              <span className="font-bold">البيانات التاريخية</span>
+              <span className="font-bold">البيانات التاريخية ({historicalData.length} سهم)</span>
               <button onClick={fetchHistorical} className="text-sm bg-slate-700 px-3 py-1 rounded">تحديث</button>
             </div>
             <div className="max-h-[500px] overflow-auto">
