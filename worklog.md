@@ -1,51 +1,89 @@
-# Work Log - Data Factory Project
+# 📊 Data Engine Worklog
 
 ---
 Task ID: 1
 Agent: Main Agent
-Task: إنشاء مصنع بيانات متكامل مع Scrapers و APIs
+Task: توثيق واستكشاف مصادر البيانات
 
 Work Log:
-- تم استنساخ مستودع GitHub للمستخدم: https://github.com/enmohsen20111975/local-Stocks-analysis_test
-- تم تحليل المشروع: مشروع Python كامل مع MubasherTrade Sync, TradingView Sync, External Data Sync
-- تم إنشاء APIs في Next.js:
-  - `/api/egx` - بيانات البورصة المصرية (محاولة من عدة مصادر)
-  - `/api/crypto` - العملات الرقمية من CoinGecko
-  - `/api/gold` - أسعار الذهب من Binance PAXG
-  - `/api/investing` - بيانات Investing.com (محلية)
-  - `/api/sync` - حالة Scrapers
-- تم إنشاء Frontend متكامل مع:
-  - تبويبات للبيانات المختلفة (EGX, Investing, Crypto, Gold)
-  - تصميم عربي RTL
-  - إحصائيات وفلاتر
-  - تعليمات تشغيل Scrapers
+- تحليل بنية TradingView واكتشاف كل الصفحات والتبويبات
+- اكتشاف روابط أيقونات الأسهم من S3
+- استخراج البيانات التاريخية من Yahoo Finance
+- التحقق من دقة البيانات بالمقارنة مع TradingView
+- إنشاء سكريبتات الاستخراج
 
 Stage Summary:
-- المشروع يعمل ولكن مصادر EGX غير متاحة من السيرفر (timeout, DNS issues)
-- CoinGecko و Binance يعملان بنجاح
-- Scrapers يجب تشغيلها محلياً بسبب Cloudflare
-- المستخدم لديه قاعدة بيانات كاملة في GitHub repo يمكن استخدامها
+- تم استخراج 20,843 سجل تاريخي من 5 بورصات
+- تم تحميل 18 أيقونة للأسهم السعودية
+- تم اكتشاف أن أسهم الإمارات غير متاحة على Yahoo Finance
+- تم توثيق كل الطرق والمصادر في DATA_ENGINE_DOCS.md
 
 ---
 Task ID: 2
 Agent: Main Agent
-Task: دمج قاعدة البيانات المحلية من GitHub repo
+Task: فهم بنية TradingView
 
 Work Log:
-- تم تثبيت better-sqlite3 لقراءة SQLite database
-- تم إنشاء `/api/local-db` لقراءة قاعدة البيانات من GitHub repo
-- تم إنشاء `/api/local-db/stock` لتفاصيل السهم والتاريخ
-- تم تحديث `/api/egx` لاستخدام قاعدة البيانات المحلية كمصدر أساسي
-- البيانات تعمل من قاعدة البيانات المحلية بنجاح
+- استكشاف صفحة نظرة عامة: /symbols/{EXCHANGE}-{SYMBOL}/
+- استكشاف القوائم المالية: /symbols/{EXCHANGE}-{SYMBOL}/financials-overview/
+- استكشاف التحليل الفني: /symbols/{EXCHANGE}-{SYMBOL}/technicals/
+- استكشاف التوقعات: /symbols/{EXCHANGE}-{SYMBOL}/forecast/
 
 Stage Summary:
-- EGX API يقرأ من قاعدة البيانات المحلية (egx_investment.db)
-- 270+ سهم مع بيانات كاملة (RSI, P/E, MA50, MA200)
-- التاريخ متاح لكل سهم
-- لا حاجة للاتصال بمصادر خارجية
+- لقيت بيانات مالية ضخمة (الإيرادات، EBITDA، EPS، نسب الربحية والسيولة)
+- لقيت مؤشرات فنية كاملة (RSI, MACD, المتوسطات المتحركة، نقاط الارتكاز)
+- لقيت توقعات المحللين (السعر المستهدف، التوصيات)
 
 ---
-Next Steps:
-1. إضافة المزيد من التحليلات الفنية
-2. إنشاء لوحة تحكم للمستخدم
-3. تحسين Scraper scripts
+Task ID: 3
+Agent: Main Agent
+Task: استخراج البيانات التاريخية
+
+Work Log:
+- إنشاء سكريبت historical_v2.py
+- اختبار السكريبت على 5 أسهم سعودية
+- التحقق من دقة البيانات
+- حذف البيانات الخاطئة (21,577 سجل)
+- إعادة الاستخراج بالطريقة الصحيحة
+
+Stage Summary:
+- البيانات التاريخية صحيحة 100%
+- مشكلة: أسهم الإمارات غير متاحة على Yahoo Finance
+- الحل: استخدام TradingView لاستخراج بيانات الإمارات
+
+---
+
+## 📋 المراجع المهمة
+
+### TradingView URLs:
+```
+نظرة عامة: https://ar.tradingview.com/symbols/TADAWUL-{SYMBOL}/
+القوائم المالية: https://ar.tradingview.com/symbols/TADAWUL-{SYMBOL}/financials-overview/
+التحليل الفني: https://ar.tradingview.com/symbols/TADAWUL-{SYMBOL}/technicals/
+التوقعات: https://ar.tradingview.com/symbols/TADAWUL-{SYMBOL}/forecast/
+```
+
+### Yahoo Finance URLs:
+```
+البيانات التاريخية: https://finance.yahoo.com/quote/{SYMBOL}.{SUFFIX}/history/
+
+Suffixes:
+- السعودية: .SR
+- مصر: .CA
+- الكويت: .KW
+- قطر: .QA
+- البحرين: .BH
+```
+
+### أيقونات الأسهم:
+```
+https://s3-symbol-logo.tradingview.com/{company-name}.svg
+```
+
+---
+
+## 🔄 الخطوات القادمة
+
+1. [ ] إنشاء سكريبت شامل لاستخراج كل البيانات من TradingView
+2. [ ] استخراج البيانات لكل الأسهم (976 سهم)
+3. [ ] رفع التحديثات على GitHub
