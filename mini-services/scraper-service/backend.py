@@ -56,20 +56,20 @@ def update_status(status_data):
     try:
         with open(LOG_FILE, 'w', encoding='utf-8') as f:
             json.dump(status_data, f, ensure_ascii=False, indent=2)
-    except:
-        pass
+    except Exception as e:
+        print(f"Warning: Could not write status file: {e}")
 
 def log(message, status_data=None, level='info'):
     """طباعة وتحديث الحالة"""
     timestamp = datetime.now().strftime('%H:%M:%S')
     full_msg = f"[{timestamp}] {message}"
-    print(full_msg)
+    print(full_msg, flush=True)
     
     if status_data is not None:
         status_data['logs'] = status_data.get('logs', [])
         status_data['logs'].append({'time': timestamp, 'level': level, 'message': message})
-        # احتفظ بآخر 100 سجل بس
-        status_data['logs'] = status_data['logs'][-100:]
+        # احتفظ بآخر 200 سجل
+        status_data['logs'] = status_data['logs'][-200:]
         update_status(status_data)
 
 # =============================================================================
@@ -98,6 +98,15 @@ def get_stocks_by_exchange(exchange):
     stocks = [dict(row) for row in c.fetchall()]
     conn.close()
     return stocks
+
+def get_historical_count(symbol):
+    """الحصول على عدد السجلات التاريخية لسهم معين"""
+    conn = get_db()
+    c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM HistoricalData WHERE stockId = (SELECT id FROM Stock WHERE symbol = ?)', (symbol,))
+    count = c.fetchone()[0]
+    conn.close()
+    return count
 
 # =============================================================================
 # استخراج الأسعار من TradingView
@@ -150,6 +159,7 @@ def update_stock_prices(stocks=None, status_data=None):
 
     updated = 0
     failed = 0
+    errors_detail = []
 
     for i, stock in enumerate(stocks):
         symbol = stock['symbol']
@@ -178,12 +188,24 @@ def update_stock_prices(stocks=None, status_data=None):
             updated += 1
         else:
             failed += 1
+            if len(errors_detail) < 20:  # احتفظ بأول 20 خطأ
+                errors_detail.append(f"{symbol} ({exchange})")
 
         time.sleep(0.3)  # تأخير لتجنب الحظر
 
-    log(f"✅ انتهى تحديث الأسعار: {updated} نجح, {failed} فشل", status_data)
+    # ملخص نهائي
+    log(f"\n{'='*50}", status_data)
+    log(f"✅ انتهى تحديث الأسعار", status_data)
+    log(f"📊 الإجمالي: {len(stocks)} سهم", status_data)
+    log(f"✅ نجح: {updated}", status_data)
+    log(f"❌ فشل: {failed}", status_data)
+    
+    if errors_detail:
+        log(f"⚠️ أمثلة على الأخطاء: {', '.join(errors_detail[:10])}", status_data)
+
     status_data['progress'] = 100
     status_data['status'] = 'completed'
+    status_data['summary'] = {'success': updated, 'failed': failed}
     update_status(status_data)
     
     return updated, failed
@@ -195,7 +217,7 @@ def fetch_historical_from_yahoo(symbol, exchange, period='1y'):
     """استخراج البيانات التاريخية من Yahoo Finance"""
     yahoo_suffix = EXCHANGE_MAP.get(exchange, {}).get('yahoo')
     if not yahoo_suffix:
-        return None, "Yahoo Finance not available"
+        return None, "Yahoo Finance not available for this exchange"
 
     yahoo_symbol = f"{symbol}{yahoo_suffix}"
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}"
@@ -214,7 +236,7 @@ def fetch_historical_from_yahoo(symbol, exchange, period='1y'):
 
         result = data.get('chart', {}).get('result', [])
         if not result:
-            return None, "No data"
+            return None, "No data available"
 
         quote = result[0]
         timestamps = quote.get('timestamp', [])
@@ -251,17 +273,29 @@ def update_historical_data(stocks=None, period='5y', status_data=None):
     stocks_with_yahoo = [s for s in stocks if EXCHANGE_MAP.get(s['exchange'], {}).get('yahoo')]
     stocks_no_yahoo = [s for s in stocks if not EXCHANGE_MAP.get(s['exchange'], {}).get('yahoo')]
 
+    log(f"\n{'='*60}", status_data)
     log(f"📊 بدء جلب البيانات التاريخية", status_data)
+    log(f"{'='*60}", status_data)
     log(f"📌 الفترة: {period}", status_data)
     log(f"📈 أسهم مدعومة (Yahoo): {len(stocks_with_yahoo)}", status_data)
-    log(f"⚠️ أسهم غير مدعومة: {len(stocks_no_yahoo)} (الإمارات)", status_data)
+    log(f"⚠️ أسهم غير مدعومة: {len(stocks_no_yahoo)} (الإمارات ليس لها Yahoo)", status_data)
 
     # حساب عدد السجلات المتوقع
     period_days = {'1y': 250, '2y': 500, '5y': 1250, '10y': 2500, 'max': 5000}
     expected_per_stock = period_days.get(period, 1250)
     total_expected = len(stocks_with_yahoo) * expected_per_stock
     
-    log(f"🎯 متوقع ~{total_expected:,} سجل", status_data)
+    log(f"🎯 متوقع ~{total_expected:,} سجل تاريخي", status_data)
+    
+    # تفاصيل كل بورصة
+    log(f"\n📍 توزيع الأسهم المدعومة:", status_data)
+    by_exchange_count = {}
+    for s in stocks_with_yahoo:
+        ex = s['exchange']
+        by_exchange_count[ex] = by_exchange_count.get(ex, 0) + 1
+    for ex, count in by_exchange_count.items():
+        country = EXCHANGE_MAP.get(ex, {}).get('country', ex)
+        log(f"   • {country}: {count} سهم", status_data)
 
     status_data['total'] = len(stocks_with_yahoo)
     status_data['current'] = 0
@@ -270,6 +304,7 @@ def update_historical_data(stocks=None, period='5y', status_data=None):
 
     total_records = 0
     failed = 0
+    failed_details = []
 
     for i, stock in enumerate(stocks_with_yahoo):
         symbol = stock['symbol']
@@ -315,14 +350,18 @@ def update_historical_data(stocks=None, period='5y', status_data=None):
             status_data['by_exchange'][exchange]['success'] += 1
             status_data['by_exchange'][exchange]['records'] += records
 
-            # Log كل 20 سهم
-            if (i + 1) % 20 == 0:
-                log(f"📈 [{i+1}/{len(stocks_with_yahoo)}] {total_records:,} سجل | {failed} فشل", status_data)
+            # Log كل 25 سهم
+            if (i + 1) % 25 == 0:
+                success_count = len(stocks_with_yahoo) - failed
+                log(f"📈 [{i+1}/{len(stocks_with_yahoo)}] {total_records:,} سجل | ✅ {success_count} نجح | ❌ {failed} فشل", status_data)
         else:
             failed += 1
             if exchange not in status_data['by_exchange']:
                 status_data['by_exchange'][exchange] = {'success': 0, 'failed': 0, 'records': 0}
             status_data['by_exchange'][exchange]['failed'] += 1
+            
+            if len(failed_details) < 30:  # احتفظ بأول 30 خطأ
+                failed_details.append(f"{symbol} ({exchange}): {error}")
 
         time.sleep(0.3)
         
@@ -331,19 +370,33 @@ def update_historical_data(stocks=None, period='5y', status_data=None):
             update_status(status_data)
 
     # ملخص نهائي
-    log(f"\n{'='*50}", status_data)
+    log(f"\n{'='*60}", status_data)
     log(f"✅ انتهى جلب البيانات التاريخية", status_data)
-    log(f"📊 الإجمالي: {total_records:,} سجل", status_data)
-    log(f"✅ نجح: {len(stocks_with_yahoo) - failed} سهم", status_data)
-    log(f"❌ فشل: {failed} سهم", status_data)
+    log(f"{'='*60}", status_data)
+    log(f"📊 إجمالي السجلات: {total_records:,}", status_data)
+    log(f"✅ أسهم نجحت: {len(stocks_with_yahoo) - failed}", status_data)
+    log(f"❌ أسهم فشلت: {failed}", status_data)
     
     # تفاصيل كل بورصة
+    log(f"\n📍 تفاصيل كل بورصة:", status_data)
     for ex, data in status_data.get('by_exchange', {}).items():
         country = EXCHANGE_MAP.get(ex, {}).get('country', ex)
-        log(f"  📍 {country}: {data['success']} نجح, {data['failed']} فشل, {data['records']:,} سجل", status_data)
+        success_rate = (data['success'] / (data['success'] + data['failed']) * 100) if (data['success'] + data['failed']) > 0 else 0
+        log(f"   • {country}: {data['success']} نجح, {data['failed']} فشل ({success_rate:.1f}%), {data['records']:,} سجل", status_data)
+    
+    # أمثلة على الأخطاء
+    if failed_details:
+        log(f"\n⚠️ أمثلة على الأخطاء:", status_data)
+        for detail in failed_details[:15]:
+            log(f"   • {detail}", status_data)
 
     status_data['progress'] = 100
     status_data['status'] = 'completed'
+    status_data['summary'] = {
+        'total_records': total_records,
+        'success': len(stocks_with_yahoo) - failed,
+        'failed': failed
+    }
     update_status(status_data)
 
     return total_records, failed
@@ -408,9 +461,15 @@ def download_all_icons(stocks=None, status_data=None):
 
         time.sleep(0.1)
 
-    log(f"✅ انتهى تحميل الأيقونات: {downloaded} جديد, {existing} موجود, {failed} فشل", status_data)
+    log(f"\n{'='*50}", status_data)
+    log(f"✅ انتهى تحميل الأيقونات", status_data)
+    log(f"📥 جديد: {downloaded}", status_data)
+    log(f"📁 موجود: {existing}", status_data)
+    log(f"❌ فشل: {failed}", status_data)
+    
     status_data['progress'] = 100
     status_data['status'] = 'completed'
+    status_data['summary'] = {'downloaded': downloaded, 'existing': existing, 'failed': failed}
     update_status(status_data)
 
     return downloaded, existing, failed
@@ -463,14 +522,26 @@ def main():
     update_status(status_data)
 
     print(f"\n{'='*60}")
-    print("Data Engine Backend")
+    print("🏭 Data Engine Backend")
     print(f"{'='*60}")
-    print(f"Database: {DB_PATH}")
-    print(f"Icons: {ICONS_DIR}")
+    print(f"📂 Database: {os.path.abspath(DB_PATH)}")
+    print(f"🖼️ Icons: {os.path.abspath(ICONS_DIR)}")
+    print(f"📝 Status: {os.path.abspath(LOG_FILE)}")
 
     # فلترة البورصة لو محدد
     stocks = get_stocks_by_exchange(args.exchange) if args.exchange else get_all_stocks()
-    print(f"Stocks: {len(stocks)}")
+    print(f"📊 Stocks: {len(stocks)}")
+    
+    # توزيع الأسهم
+    if stocks:
+        by_ex = {}
+        for s in stocks:
+            ex = s['exchange']
+            by_ex[ex] = by_ex.get(ex, 0) + 1
+        print("📍 التوزيع:")
+        for ex, count in by_ex.items():
+            country = EXCHANGE_MAP.get(ex, {}).get('country', ex)
+            print(f"   • {country}: {count}")
 
     if args.schedule:
         run_scheduled()
@@ -491,7 +562,7 @@ def main():
         download_all_icons(stocks, status_data)
 
     print(f"\n{'='*60}")
-    print("تم الانتهاء!")
+    print("✅ تم الانتهاء!")
     print(f"{'='*60}")
 
 if __name__ == '__main__':
