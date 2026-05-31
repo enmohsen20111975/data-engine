@@ -62,6 +62,33 @@ interface LogEntry {
   message: string;
 }
 
+interface DataReport {
+  summary: {
+    totalStocks: number;
+    stocksWithData: number;
+    stocksWithoutData: number;
+    totalHistoricalRecords: number;
+    dataCoverage: string;
+  };
+  exchangeDetails: {
+    exchange: string;
+    country: string;
+    totalStocks: number;
+    stocksWithData: number;
+    stocksWithoutData: number;
+    successRate: string;
+    recordsCount: number;
+    yahooSupport: boolean;
+  }[];
+  sampleEmptyStocks: {
+    symbol: string;
+    name: string;
+    exchange: string;
+    country: string;
+  }[];
+  stocksExchangesWithoutYahoo: string[];
+}
+
 export default function DataFactory() {
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [historicalData, setHistoricalData] = useState<HistoricalSummary[]>([]);
@@ -69,7 +96,7 @@ export default function DataFactory() {
   const [loading, setLoading] = useState(true);
   const [selectedExchange, setSelectedExchange] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'stocks' | 'historical' | 'control' | 'console'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'stocks' | 'historical' | 'control' | 'console' | 'report'>('report');
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [taskRunning, setTaskRunning] = useState(false);
   const [currentTask, setCurrentTask] = useState<string | null>(null);
@@ -86,6 +113,10 @@ export default function DataFactory() {
   
   // Period for historical data
   const [selectedPeriod, setSelectedPeriod] = useState<string>('5y');
+  
+  // Data report
+  const [dataReport, setDataReport] = useState<DataReport | null>(null);
+  const [loadingReport, setLoadingReport] = useState(true);
   
   // Scraper status (real-time from backend)
   const [scraperStatus, setScraperStatus] = useState<{
@@ -116,11 +147,27 @@ export default function DataFactory() {
     }
   }, [log]);
 
+  // Fetch data report
+  const fetchDataReport = useCallback(async () => {
+    try {
+      setLoadingReport(true);
+      const res = await fetch('/api/scraper/report');
+      if (res.ok) {
+        const data = await res.json();
+        setDataReport(data);
+      }
+    } catch (e) {
+      log('error', 'فشل في تحميل التقرير');
+    } finally {
+      setLoadingReport(false);
+    }
+  }, [log]);
+
   // Fetch ALL stocks (no limit)
   const fetchStocks = useCallback(async () => {
     try {
       log('info', 'جاري تحميل قائمة الأسهم...');
-      const res = await fetch('/api/stocks?limit=1000'); // Fetch all stocks
+      const res = await fetch('/api/stocks?limit=1000');
       if (res.ok) {
         const data = await res.json();
         setStocks(data);
@@ -158,14 +205,12 @@ export default function DataFactory() {
     setStockHistorical([]);
     
     try {
-      // Fetch overview
       const overviewRes = await fetch(`/api/stocks/${stock.symbol}/overview`);
       if (overviewRes.ok) {
         const overviewData = await overviewRes.json();
         setStockOverview(overviewData);
       }
       
-      // Fetch historical
       const histRes = await fetch(`/api/stocks/${stock.symbol}/historical?limit=30`);
       if (histRes.ok) {
         const histData = await histRes.json();
@@ -203,7 +248,6 @@ export default function DataFactory() {
           const data = await res.json();
           setScraperStatus(data);
           
-          // Update taskRunning based on status
           if (data.status === 'running') {
             setTaskRunning(true);
             setCurrentTask(data.task || 'جاري المعالجة...');
@@ -218,9 +262,8 @@ export default function DataFactory() {
       }
     };
     
-    // Poll every 2 seconds
     const interval = setInterval(fetchStatus, 2000);
-    fetchStatus(); // Initial fetch
+    fetchStatus();
     
     return () => clearInterval(interval);
   }, []);
@@ -229,7 +272,8 @@ export default function DataFactory() {
   useEffect(() => {
     fetchStats();
     fetchStocks();
-  }, [fetchStats, fetchStocks]);
+    fetchDataReport();
+  }, [fetchStats, fetchStocks, fetchDataReport]);
 
   // Load historical on tab change
   useEffect(() => {
@@ -258,7 +302,6 @@ export default function DataFactory() {
     setProgress(0);
     log('info', `▶️ بدء: ${name}`);
 
-    // Progress simulation
     const progressInterval = setInterval(() => {
       setProgress(p => Math.min(p + 3, 85));
     }, 300);
@@ -280,10 +323,10 @@ export default function DataFactory() {
         log('error', `❌ فشل: ${data.error || 'خطأ غير معروف'}`);
       }
 
-      // Refresh after 2 seconds
       setTimeout(() => {
         fetchStats();
         fetchStocks();
+        fetchDataReport();
         setTaskRunning(false);
         setCurrentTask(null);
         setProgress(0);
@@ -335,7 +378,6 @@ export default function DataFactory() {
       {selectedStock && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setSelectedStock(null)}>
           <div className="bg-slate-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
-            {/* Header */}
             <div className="bg-slate-700 p-4 flex items-center gap-4 sticky top-0">
               {selectedStock.iconUrl && (
                 <img src={selectedStock.iconUrl} alt={selectedStock.symbol} className="w-12 h-12 rounded" />
@@ -354,7 +396,6 @@ export default function DataFactory() {
               </div>
             ) : (
               <div className="p-4 space-y-6">
-                {/* Basic Info */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className="bg-slate-700 rounded p-3">
                     <div className="text-slate-400 text-sm">البورصة</div>
@@ -374,7 +415,6 @@ export default function DataFactory() {
                   </div>
                 </div>
 
-                {/* Overview */}
                 {stockOverview && (
                   <div className="bg-slate-700 rounded-lg p-4">
                     <h3 className="font-bold mb-3 text-emerald-400">📊 نظرة عامة</h3>
@@ -399,54 +439,10 @@ export default function DataFactory() {
                         <div className="text-slate-400 text-sm">P/E</div>
                         <div className="font-bold">{stockOverview.peRatioTTM?.toFixed(2) || '—'}</div>
                       </div>
-                      <div>
-                        <div className="text-slate-400 text-sm">EPS</div>
-                        <div className="font-bold">{stockOverview.epsTTM?.toFixed(2) || '—'}</div>
-                      </div>
-                      <div>
-                        <div className="text-slate-400 text-sm">عائد التوزيعات</div>
-                        <div className="font-bold">{stockOverview.dividendYield?.toFixed(2) || '—'}%</div>
-                      </div>
-                      <div>
-                        <div className="text-slate-400 text-sm">الموظفين</div>
-                        <div className="font-bold">{stockOverview.employees?.toLocaleString() || '—'}</div>
-                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* Company Info */}
-                <div className="bg-slate-700 rounded-lg p-4">
-                  <h3 className="font-bold mb-3 text-blue-400">🏢 معلومات الشركة</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-slate-400 text-sm">الموقع الإلكتروني</div>
-                      <div className="font-bold">{selectedStock.website ? (
-                        <a href={`https://${selectedStock.website}`} target="_blank" className="text-cyan-400 hover:underline">{selectedStock.website}</a>
-                      ) : '—'}</div>
-                    </div>
-                    <div>
-                      <div className="text-slate-400 text-sm">المقر</div>
-                      <div className="font-bold">{selectedStock.headquarters || '—'}</div>
-                    </div>
-                    <div>
-                      <div className="text-slate-400 text-sm">سنة التأسيس</div>
-                      <div className="font-bold">{selectedStock.foundedYear || '—'}</div>
-                    </div>
-                    <div>
-                      <div className="text-slate-400 text-sm">ISIN</div>
-                      <div className="font-bold font-mono text-sm">{selectedStock.isin || '—'}</div>
-                    </div>
-                  </div>
-                  {selectedStock.description && (
-                    <div className="mt-4 pt-4 border-t border-slate-600">
-                      <div className="text-slate-400 text-sm mb-1">الوصف</div>
-                      <p className="text-slate-200">{selectedStock.description}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Historical Chart Data */}
                 {stockHistorical.length > 0 && (
                   <div className="bg-slate-700 rounded-lg p-4">
                     <h3 className="font-bold mb-3 text-purple-400">📈 آخر 30 يوم</h3>
@@ -504,6 +500,7 @@ export default function DataFactory() {
       <nav className="bg-slate-800/50 border-b border-slate-700">
         <div className="max-w-7xl mx-auto flex overflow-x-auto">
           {[
+            { id: 'report', label: '📋 التقرير' },
             { id: 'dashboard', label: '📊 الرئيسية' },
             { id: 'stocks', label: '📈 الأسهم' },
             { id: 'historical', label: '📉 السجل التاريخي' },
@@ -524,6 +521,145 @@ export default function DataFactory() {
       </nav>
 
       <main className="max-w-7xl mx-auto p-6">
+        {/* Report Tab - THE TRUTH */}
+        {activeTab === 'report' && (
+          <div className="space-y-6">
+            {loadingReport ? (
+              <div className="text-center py-10">
+                <div className="text-4xl animate-spin">⚙️</div>
+                <p className="mt-2">جاري تحميل التقرير...</p>
+              </div>
+            ) : dataReport ? (
+              <>
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="bg-slate-800 rounded-lg p-4">
+                    <div className="text-3xl font-bold text-blue-400">{dataReport.summary.totalStocks}</div>
+                    <div className="text-slate-400">إجمالي الأسهم</div>
+                  </div>
+                  <div className="bg-slate-800 rounded-lg p-4">
+                    <div className="text-3xl font-bold text-emerald-400">{dataReport.summary.stocksWithData}</div>
+                    <div className="text-slate-400">لديها بيانات</div>
+                  </div>
+                  <div className="bg-slate-800 rounded-lg p-4">
+                    <div className="text-3xl font-bold text-red-400">{dataReport.summary.stocksWithoutData}</div>
+                    <div className="text-slate-400">بدون بيانات ❌</div>
+                  </div>
+                  <div className="bg-slate-800 rounded-lg p-4">
+                    <div className="text-3xl font-bold text-purple-400">{dataReport.summary.dataCoverage}%</div>
+                    <div className="text-slate-400">نسبة التغطية</div>
+                  </div>
+                  <div className="bg-slate-800 rounded-lg p-4">
+                    <div className="text-3xl font-bold text-amber-400">{dataReport.summary.totalHistoricalRecords.toLocaleString()}</div>
+                    <div className="text-slate-400">سجل تاريخي</div>
+                  </div>
+                </div>
+
+                {/* Warning if low coverage */}
+                {parseFloat(dataReport.summary.dataCoverage) < 80 && (
+                  <div className="bg-red-900/30 border border-red-500 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-red-400 font-bold">
+                      <span className="text-2xl">⚠️</span>
+                      <span>تحذير: نسبة التغطية منخفضة!</span>
+                    </div>
+                    <p className="text-slate-300 mt-2">
+                      {dataReport.summary.stocksWithoutData} سهم بدون بيانات تاريخية. 
+                      قد يكون السبب: عدم توفر البيانات على Yahoo Finance أو أخطاء في الشبكة.
+                    </p>
+                  </div>
+                )}
+
+                {/* Exchange Details */}
+                <div className="bg-slate-800 rounded-lg p-6">
+                  <h2 className="text-lg font-bold mb-4">📊 تفاصيل كل بورصة</h2>
+                  <div className="overflow-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-700">
+                        <tr>
+                          <th className="p-3 text-right">البورصة</th>
+                          <th className="p-3 text-right">إجمالي</th>
+                          <th className="p-3 text-right">لديها بيانات</th>
+                          <th className="p-3 text-right">بدون بيانات</th>
+                          <th className="p-3 text-right">نسبة النجاح</th>
+                          <th className="p-3 text-right">السجلات</th>
+                          <th className="p-3 text-right">Yahoo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dataReport.exchangeDetails.map((ex, i) => (
+                          <tr key={i} className={`border-t border-slate-700 ${parseFloat(ex.successRate) < 50 ? 'bg-red-900/20' : ''}`}>
+                            <td className="p-3 font-bold">{ex.country}</td>
+                            <td className="p-3">{ex.totalStocks}</td>
+                            <td className="p-3 text-emerald-400">{ex.stocksWithData}</td>
+                            <td className="p-3 text-red-400">{ex.stocksWithoutData}</td>
+                            <td className="p-3">
+                              <span className={`px-2 py-1 rounded ${parseFloat(ex.successRate) >= 80 ? 'bg-emerald-900/50 text-emerald-400' : parseFloat(ex.successRate) >= 50 ? 'bg-amber-900/50 text-amber-400' : 'bg-red-900/50 text-red-400'}`}>
+                                {ex.successRate}%
+                              </span>
+                            </td>
+                            <td className="p-3 text-blue-400 font-mono">{ex.recordsCount.toLocaleString()}</td>
+                            <td className="p-3">
+                              {ex.yahooSupport ? (
+                                <span className="text-emerald-400">✓</span>
+                              ) : (
+                                <span className="text-red-400" title="Yahoo Finance not available">✗</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Sample Empty Stocks */}
+                {dataReport.sampleEmptyStocks.length > 0 && (
+                  <div className="bg-slate-800 rounded-lg p-6">
+                    <h2 className="text-lg font-bold mb-4 text-red-400">
+                      ❌ أمثلة على الأسهم بدون بيانات ({dataReport.summary.stocksWithoutData} سهم)
+                    </h2>
+                    <div className="max-h-64 overflow-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-700">
+                          <tr>
+                            <th className="p-2 text-right">الرمز</th>
+                            <th className="p-2 text-right">الاسم</th>
+                            <th className="p-2 text-right">البورصة</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dataReport.sampleEmptyStocks.map((s, i) => (
+                            <tr key={i} className="border-t border-slate-700">
+                              <td className="p-2 font-mono text-cyan-400">{s.symbol}</td>
+                              <td className="p-2">{s.name}</td>
+                              <td className="p-2">{s.country}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Info about UAE */}
+                <div className="bg-amber-900/30 border border-amber-500 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-amber-400 font-bold">
+                    <span>ℹ️</span>
+                    <span>ملاحظة</span>
+                  </div>
+                  <p className="text-slate-300 mt-2">
+                    بورصة الإمارات (UAE) ليس لها بيانات على Yahoo Finance، لذلك لن تجد بيانات تاريخية لها.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-10 text-red-400">
+                فشل تحميل التقرير
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Dashboard */}
         {activeTab === 'dashboard' && stats && (
           <div className="space-y-6">
