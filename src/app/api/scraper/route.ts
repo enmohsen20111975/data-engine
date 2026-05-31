@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import path from 'path';
 
 const execAsync = promisify(exec);
 
-const SCRAPER_PATH = '/home/z/my-project/mini-services/scraper-service/backend.py';
-const PYTHON_PATH = '/home/z/my-project/mini-services/scraper-service/venv/bin/python';
+// Use process.cwd() to get the project root directory dynamically
+const PROJECT_ROOT = process.cwd();
+const SCRAPER_PATH = path.join(PROJECT_ROOT, 'mini-services', 'scraper-service', 'backend.py');
+const PYTHON_PATH = path.join(PROJECT_ROOT, 'mini-services', 'scraper-service', 'venv', 'bin', 'python');
 
 // Exchange to country mapping
 const EXCHANGE_COUNTRY_MAP: Record<string, string> = {
