@@ -102,7 +102,10 @@ def index():
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🏭 مصنع البيانات - Arabic Stock Data Engine</title>
+<title>🏭 مصنع البيانات - Arabic Stock Data Engine v2</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',system-ui;background:linear-gradient(135deg,#0a0a0f 0%,#1a1a2e 100%);color:#fff;min-height:100vh;padding:20px}
@@ -343,7 +346,7 @@ function clearData() {
 }
 
 refresh();
-setInterval(refresh, 5000);
+setInterval(refresh, 10000);
 </script>
 </body>
 </html>'''
