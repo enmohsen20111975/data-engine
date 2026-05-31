@@ -239,9 +239,10 @@ footer{text-align:center;padding:24px;opacity:0.4;font-size:13px;margin-top:24px
 
 <script>
 let running = false;
+const API = '/?XTransformPort=5001';
 
 function refresh() {
-    fetch('/api/stats').then(r => r.json()).then(d => {
+    fetch('/api/stats?XTransformPort=5001').then(r => r.json()).then(d => {
         if(d.s) {
             document.getElementById('stocks').textContent = d.s.stocks || 0;
             document.getElementById('overview').textContent = d.s.overview || 0;
@@ -250,7 +251,7 @@ function refresh() {
         }
     });
 
-    fetch('/api/status').then(r => r.json()).then(d => {
+    fetch('/api/status?XTransformPort=5001').then(r => r.json()).then(d => {
         if(!d.s) return;
         running = d.s.is_running;
         const ps = document.getElementById('progressSection');
@@ -294,7 +295,7 @@ function refresh() {
         }
     });
 
-    fetch('/api/stocks?exchange=' + document.getElementById('exchangeSelect').value)
+    fetch('/api/stocks?exchange=' + document.getElementById('exchangeSelect').value + '&XTransformPort=5001')
         .then(r => r.json())
         .then(d => {
             if(d.stocks && d.stocks.length > 0) {
@@ -324,10 +325,10 @@ function formatNum(n) {
 
 function startScraping() {
     if(running) {
-        fetch('/api/stop', {method: 'POST'});
+        fetch('/api/stop?XTransformPort=5001', {method: 'POST'});
     } else {
         const exchange = document.getElementById('exchangeSelect').value;
-        fetch('/api/start', {
+        fetch('/api/start?XTransformPort=5001', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({exchange})
@@ -337,7 +338,7 @@ function startScraping() {
 
 function clearData() {
     if(confirm('هل أنت متأكد من تفريغ جميع البيانات؟')) {
-        fetch('/api/clear', {method: 'POST'}).then(refresh);
+        fetch('/api/clear?XTransformPort=5001', {method: 'POST'}).then(refresh);
     }
 }
 
