@@ -245,81 +245,76 @@ footer{text-align:center;padding:24px;opacity:0.4;font-size:13px;margin-top:24px
 
 <script>
 let running = false;
-const API = '/?XTransformPort=5001';
 
-function refresh() {
-    fetch('/api/stats?XTransformPort=5001').then(r => r.json()).then(d => {
-        if(d.s) {
-            document.getElementById('stocks').textContent = d.s.stocks || 0;
-            document.getElementById('overview').textContent = d.s.overview || 0;
-            document.getElementById('marketCap').textContent = d.s.withMarketCap || 0;
-            document.getElementById('exchanges').textContent = d.s.exchanges || 0;
+async function refresh() {
+    try {
+        const [statsRes, statusRes, stocksRes] = await Promise.all([
+            fetch('/api/stats?XTransformPort=5001'),
+            fetch('/api/status?XTransformPort=5001'),
+            fetch('/api/stocks?exchange=' + document.getElementById('exchangeSelect').value + '&XTransformPort=5001')
+        ]);
+        
+        const stats = await statsRes.json();
+        const status = await statusRes.json();
+        const stocks = await stocksRes.json();
+        
+        if(stats.s) {
+            document.getElementById('stocks').textContent = stats.s.stocks || 0;
+            document.getElementById('overview').textContent = stats.s.overview || 0;
+            document.getElementById('marketCap').textContent = stats.s.withMarketCap || 0;
+            document.getElementById('exchanges').textContent = stats.s.exchanges || 0;
         }
-    });
+        
+        if(status.s) {
+            running = status.s.is_running;
+            const ps = document.getElementById('progressSection');
+            const btn = document.getElementById('startBtn');
+            const select = document.getElementById('exchangeSelect');
 
-    fetch('/api/status?XTransformPort=5001').then(r => r.json()).then(d => {
-        if(!d.s) return;
-        running = d.s.is_running;
-        const ps = document.getElementById('progressSection');
-        const btn = document.getElementById('startBtn');
-        const select = document.getElementById('exchangeSelect');
-
-        if(running) {
-            ps.style.display = 'block';
-            btn.textContent = '⏹️ إيقاف';
-            btn.className = 'btn btn-danger';
-            select.disabled = true;
-
-            document.getElementById('exchangeName').textContent = d.s.exchange || '-';
-            document.getElementById('progressPercent').textContent = (d.s.progress || 0).toFixed(0);
-            document.getElementById('progressFill').style.width = (d.s.progress || 0) + '%';
-            document.getElementById('processed').textContent = d.s.processed || 0;
-            document.getElementById('failed').textContent = d.s.failed || 0;
-            document.getElementById('total').textContent = d.s.total || 0;
-            document.getElementById('currentStock').textContent = d.s.stock || '-';
-        } else {
-            ps.style.display = 'none';
-            btn.textContent = '▶️ بدء الاستخراج';
-            btn.className = 'btn btn-primary';
-            select.disabled = false;
-        }
-
-        // Logs
-        const logs = d.s.logs || [];
-        if(logs.length > 0) {
-            document.getElementById('logsContainer').style.display = 'block';
-            let html = '';
-            logs.slice(0, 30).forEach(l => {
-                const time = (l.time || '').split('T')[1]?.split('.')[0] || '';
-                html += `<div class="log-entry">
-                    <span class="log-time">${time}</span>
-                    <span class="log-level ${l.level || 'info'}">[${l.level || 'info'}]</span>
-                    <span>${l.msg}</span>
-                </div>`;
-            });
-            document.getElementById('logsBody').innerHTML = html;
-        }
-    });
-
-    fetch('/api/stocks?exchange=' + document.getElementById('exchangeSelect').value + '&XTransformPort=5001')
-        .then(r => r.json())
-        .then(d => {
-            if(d.stocks && d.stocks.length > 0) {
-                let html = '';
-                d.stocks.forEach(s => {
-                    html += `<div class="table-row">
-                        <span class="symbol">${s.symbol}</span>
-                        <span>${s.nameEn || s.nameAr || '-'}</span>
-                        <span><span class="exchange-badge">${s.exchange}</span></span>
-                        <span>${s.currentPrice || '-'}</span>
-                        <span>${s.marketCap ? formatNum(s.marketCap) : '-'}</span>
-                    </div>`;
-                });
-                document.getElementById('stocksBody').innerHTML = html;
+            if(running) {
+                ps.style.display = 'block';
+                btn.textContent = '⏹️ إيقاف';
+                btn.className = 'btn btn-danger';
+                select.disabled = true;
+                document.getElementById('exchangeName').textContent = status.s.exchange || '-';
+                document.getElementById('progressPercent').textContent = (status.s.progress || 0).toFixed(0);
+                document.getElementById('progressFill').style.width = (status.s.progress || 0) + '%';
+                document.getElementById('processed').textContent = status.s.processed || 0;
+                document.getElementById('failed').textContent = status.s.failed || 0;
+                document.getElementById('total').textContent = status.s.total || 0;
+                document.getElementById('currentStock').textContent = status.s.stock || '-';
+                setTimeout(refresh, 3000);
             } else {
-                document.getElementById('stocksBody').innerHTML = '<div class="table-row"><span style="opacity:0.5">لا توجد بيانات</span></div>';
+                ps.style.display = 'none';
+                btn.textContent = '▶️ بدء الاستخراج';
+                btn.className = 'btn btn-primary';
+                select.disabled = false;
             }
-        });
+
+            const logs = status.s.logs || [];
+            if(logs.length > 0) {
+                document.getElementById('logsContainer').style.display = 'block';
+                let html = '';
+                logs.slice(0, 20).forEach(l => {
+                    const time = (l.time || '').split('T')[1]?.split('.')[0] || '';
+                    html += '<div class="log-entry"><span class="log-time">' + time + '</span><span class="log-level ' + (l.level || 'info') + '">[' + (l.level || 'info') + ']</span><span>' + l.msg + '</span></div>';
+                });
+                document.getElementById('logsBody').innerHTML = html;
+            }
+        }
+        
+        if(stocks.stocks && stocks.stocks.length > 0) {
+            let html = '';
+            stocks.stocks.forEach(s => {
+                html += '<div class="table-row"><span class="symbol">' + s.symbol + '</span><span>' + (s.nameEn || s.nameAr || '-') + '</span><span><span class="exchange-badge">' + s.exchange + '</span></span><span>' + (s.currentPrice || '-') + '</span><span>' + (s.marketCap ? formatNum(s.marketCap) : '-') + '</span></div>';
+            });
+            document.getElementById('stocksBody').innerHTML = html;
+        } else {
+            document.getElementById('stocksBody').innerHTML = '<div class="table-row"><span style="opacity:0.5">لا توجد بيانات</span></div>';
+        }
+    } catch(e) {
+        console.log('Refresh error:', e);
+    }
 }
 
 function formatNum(n) {
@@ -338,7 +333,7 @@ function startScraping() {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({exchange})
-        });
+        }).then(() => setTimeout(refresh, 1000));
     }
 }
 
@@ -349,7 +344,6 @@ function clearData() {
 }
 
 refresh();
-setInterval(refresh, 10000);
 </script>
 </body>
 </html>'''
