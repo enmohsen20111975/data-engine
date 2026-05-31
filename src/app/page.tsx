@@ -83,6 +83,9 @@ export default function DataFactory() {
   
   // Icons count
   const [iconsCount, setIconsCount] = useState(0);
+  
+  // Period for historical data
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('5y');
 
   // Add log
   const log = useCallback((type: LogEntry['type'], message: string) => {
@@ -221,7 +224,7 @@ export default function DataFactory() {
       const res = await fetch('/api/scraper', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action })
+        body: JSON.stringify({ action, period: selectedPeriod })
       });
       
       const data = await res.json();
@@ -649,6 +652,35 @@ export default function DataFactory() {
         {/* Control */}
         {activeTab === 'control' && (
           <div className="space-y-6">
+            {/* Period Selector */}
+            <div className="bg-slate-800 rounded-lg p-4">
+              <h3 className="font-bold mb-3">📅 فترة البيانات التاريخية</h3>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: '1y', label: 'سنة واحدة' },
+                  { value: '2y', label: 'سنتين' },
+                  { value: '5y', label: '5 سنين (default)' },
+                  { value: '10y', label: '10 سنين' },
+                  { value: 'max', label: 'كل البيانات' }
+                ].map(p => (
+                  <button
+                    key={p.value}
+                    onClick={() => setSelectedPeriod(p.value)}
+                    className={`px-4 py-2 rounded-lg transition-all ${
+                      selectedPeriod === p.value 
+                        ? 'bg-emerald-600 text-white' 
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-slate-400 text-sm mt-2">
+                الفترة المحددة: <span className="text-emerald-400 font-bold">{selectedPeriod}</span>
+              </p>
+            </div>
+
             {/* Current Task */}
             {taskRunning && (
               <div className="bg-amber-900/30 border border-amber-600 rounded-lg p-4">

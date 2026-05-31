@@ -23,10 +23,13 @@ const EXCHANGE_COUNTRY_MAP: Record<string, string> = {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action } = body;
+    const { action, period } = body;
     
     let command = '';
     let message = '';
+    
+    // Period for historical data
+    const periodFlag = period ? `--period=${period}` : '--period=5y';
     
     switch (action) {
       case 'prices':
@@ -34,34 +37,31 @@ export async function POST(request: NextRequest) {
         message = 'تحديث الأسعار';
         break;
       case 'historical':
-        command = `${PYTHON_PATH} ${SCRAPER_PATH} --historical-only`;
-        message = 'جلب البيانات التاريخية';
+        command = `${PYTHON_PATH} ${SCRAPER_PATH} --historical-only ${periodFlag}`;
+        message = `جلب البيانات التاريخية (${period || '5 سنين'})`;
         break;
       case 'icons':
         command = `${PYTHON_PATH} ${SCRAPER_PATH} --icons-only`;
         message = 'تحميل الأيقونات';
         break;
       case 'all':
-        command = `${PYTHON_PATH} ${SCRAPER_PATH}`;
+        command = `${PYTHON_PATH} ${SCRAPER_PATH} ${periodFlag}`;
         message = 'تحديث شامل';
         break;
       case 'parallel_ksa_egx':
-        // Run KSA and EGX in parallel
-        runParallelTasks(['KSA', 'EGX']);
+        runParallelTasks(['KSA', 'EGX'], period);
         return NextResponse.json({
           success: true,
           message: `بدء المعالجة المتوازية للسعودية ومصر...`
         });
       case 'parallel_kse_qe':
-        // Run KSE and QE in parallel
-        runParallelTasks(['KSE', 'QE']);
+        runParallelTasks(['KSE', 'QE'], period);
         return NextResponse.json({
           success: true,
           message: `بدء المعالجة المتوازية للكويت وقطر...`
         });
       case 'parallel_uae_bah':
-        // Run UAE and BAH in parallel
-        runParallelTasks(['UAE', 'BAH']);
+        runParallelTasks(['UAE', 'BAH'], period);
         return NextResponse.json({
           success: true,
           message: `بدء المعالجة المتوازية للإمارات والبحرين...`
@@ -96,9 +96,10 @@ export async function POST(request: NextRequest) {
 }
 
 // Run parallel tasks for multiple exchanges
-async function runParallelTasks(exchanges: string[]) {
+async function runParallelTasks(exchanges: string[], period?: string) {
   const exchangeFlags = exchanges.map(ex => `--exchange=${ex}`).join(' ');
-  const command = `${PYTHON_PATH} ${SCRAPER_PATH} ${exchangeFlags} --parallel`;
+  const periodFlag = period ? `--period=${period}` : '--period=5y';
+  const command = `${PYTHON_PATH} ${SCRAPER_PATH} ${exchangeFlags} ${periodFlag}`;
   
   execAsync(command, {
     timeout: 600000,
@@ -116,12 +117,19 @@ export async function GET() {
     status: 'ok',
     availableActions: [
       { action: 'prices', description: 'تحديث أسعار الأسهم' },
-      { action: 'historical', description: 'جلب البيانات التاريخية' },
+      { action: 'historical', description: 'جلب البيانات التاريخية', options: ['period'] },
       { action: 'icons', description: 'تحميل أيقونات الأسهم' },
-      { action: 'all', description: 'تحديث شامل' },
+      { action: 'all', description: 'تحديث شامل', options: ['period'] },
       { action: 'parallel_ksa_egx', description: 'معالجة متوازية: السعودية + مصر' },
       { action: 'parallel_kse_qe', description: 'معالجة متوازية: الكويت + قطر' },
       { action: 'parallel_uae_bah', description: 'معالجة متوازية: الإمارات + البحرين' }
+    ],
+    availablePeriods: [
+      { value: '1y', label: 'سنة واحدة' },
+      { value: '2y', label: 'سنتين' },
+      { value: '5y', label: '5 سنين (default)' },
+      { value: '10y', label: '10 سنين' },
+      { value: 'max', label: 'كل البيانات المتاحة' }
     ]
   });
 }

@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const where = exchange ? { exchange } : {};
     
     // Use a reasonable limit to avoid memory issues
-    const safeLimit = Math.min(limit, 500);
+    const safeLimit = Math.min(limit, 2000);
     
     const stocks = await db.stock.findMany({
       where,
