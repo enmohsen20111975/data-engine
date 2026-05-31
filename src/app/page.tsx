@@ -86,6 +86,18 @@ export default function DataFactory() {
   
   // Period for historical data
   const [selectedPeriod, setSelectedPeriod] = useState<string>('5y');
+  
+  // Scraper status (real-time from backend)
+  const [scraperStatus, setScraperStatus] = useState<{
+    task?: string;
+    progress?: number;
+    status?: string;
+    total?: number;
+    current?: number;
+    total_records?: number;
+    by_exchange?: Record<string, { success: number; failed: number; records: number }>;
+    logs?: { time: string; level: string; message: string }[];
+  } | null>(null);
 
   // Add log
   const log = useCallback((type: LogEntry['type'], message: string) => {
@@ -180,6 +192,37 @@ export default function DataFactory() {
       }
     };
     countIcons();
+  }, []);
+
+  // Poll scraper status
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch('/api/scraper/status');
+        if (res.ok) {
+          const data = await res.json();
+          setScraperStatus(data);
+          
+          // Update taskRunning based on status
+          if (data.status === 'running') {
+            setTaskRunning(true);
+            setCurrentTask(data.task || 'جاري المعالجة...');
+            setProgress(data.progress || 0);
+          } else if (data.status === 'completed') {
+            setTaskRunning(false);
+            setProgress(100);
+          }
+        }
+      } catch (e) {
+        // Ignore
+      }
+    };
+    
+    // Poll every 2 seconds
+    const interval = setInterval(fetchStatus, 2000);
+    fetchStatus(); // Initial fetch
+    
+    return () => clearInterval(interval);
   }, []);
 
   // Initial load
@@ -762,22 +805,76 @@ export default function DataFactory() {
         {/* Console */}
         {activeTab === 'console' && (
           <div className="space-y-4">
-            <div className="flex justify-between">
-              <span className="font-bold">سجل العمليات</span>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <span className="font-bold">سجل العمليات</span>
+                {scraperStatus?.status === 'running' && (
+                  <span className="text-amber-400 text-sm animate-pulse">⏳ جاري التشغيل...</span>
+                )}
+              </div>
               <button onClick={() => setLogs([])} className="text-sm bg-red-900/50 text-red-400 px-3 py-1 rounded">
                 مسح
               </button>
             </div>
+            
+            {/* Real-time Stats */}
+            {scraperStatus && scraperStatus.status === 'running' && (
+              <div className="bg-slate-800 rounded-lg p-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-emerald-400">{scraperStatus.current || 0}/{scraperStatus.total || 0}</div>
+                    <div className="text-slate-400 text-sm">سهم تمت معالجته</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-blue-400">{(scraperStatus.total_records || 0).toLocaleString()}</div>
+                    <div className="text-slate-400 text-sm">سجل</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-amber-400">{scraperStatus.progress || 0}%</div>
+                    <div className="text-slate-400 text-sm">التقدم</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-purple-400">{scraperStatus.task || '—'}</div>
+                    <div className="text-slate-400 text-sm">المهمة</div>
+                  </div>
+                </div>
+                
+                {/* By Exchange */}
+                {scraperStatus.by_exchange && Object.keys(scraperStatus.by_exchange).length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-slate-700">
+                    <div className="text-sm text-slate-400 mb-2">حسب البورصة:</div>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(scraperStatus.by_exchange).map(([ex, data]) => (
+                        <div key={ex} className="bg-slate-700 px-3 py-1 rounded text-sm">
+                          <span className="text-slate-300">{ex}:</span>{' '}
+                          <span className="text-emerald-400">{data.success}</span> نجح،{' '}
+                          <span className="text-red-400">{data.failed}</span> فشل،{' '}
+                          <span className="text-blue-400">{data.records.toLocaleString()}</span> سجل
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Logs */}
             <div className="bg-black rounded-lg font-mono text-sm overflow-hidden">
               <div className="h-[400px] overflow-auto p-4" dir="ltr">
-                {logs.length === 0 ? (
-                  <p className="text-slate-500">لا توجد سجلات...</p>
-                ) : (
+                {scraperStatus?.logs && scraperStatus.logs.length > 0 ? (
+                  scraperStatus.logs.map((l, i) => (
+                    <div key={i} className={`py-1 ${l.level === 'success' ? 'text-emerald-400' : l.level === 'error' ? 'text-red-400' : 'text-slate-300'}`}>
+                      <span className="text-slate-500">[{l.time}]</span> {l.message}
+                    </div>
+                  ))
+                ) : logs.length > 0 ? (
                   logs.map((l, i) => (
                     <div key={i} className={`py-1 ${l.type === 'success' ? 'text-emerald-400' : l.type === 'error' ? 'text-red-400' : 'text-slate-300'}`}>
                       <span className="text-slate-500">[{l.time}]</span> {l.message}
                     </div>
                   ))
+                ) : (
+                  <p className="text-slate-500">لا توجد سجلات...</p>
                 )}
               </div>
             </div>
