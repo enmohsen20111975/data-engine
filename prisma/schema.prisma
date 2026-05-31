@@ -29,8 +29,8 @@ model Stock {
   iconUrl       String?
   isin          String?
   country       String?
-  createdAt     Int
-  updatedAt     Int
+  createdAt     String
+  updatedAt     String
 
   // العلاقات
   overview       StockOverview?
