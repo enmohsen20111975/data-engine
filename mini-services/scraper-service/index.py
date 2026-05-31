@@ -10,6 +10,7 @@ import uuid
 import json
 import sqlite3
 import threading
+import base64
 from datetime import datetime
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -56,7 +57,6 @@ def log(msg, level='info'):
 def run_js(js, timeout=30):
     try:
         # Use base64 to avoid escaping issues
-        import base64
         encoded = base64.b64encode(js.encode()).decode()
         cmd = f"agent-browser eval --base64 '{encoded}'"
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
