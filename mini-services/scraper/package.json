@@ -1,0 +1,11 @@
+{
+  "name": "investing-scraper",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run index.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.0.0"
+  }
+}

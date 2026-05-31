@@ -1,0 +1,3 @@
+✅ Prisma client initialized with database: /home/z/my-project/db/data-factory.db
+🕷️ Scraper Service running on http://localhost:3002
+Supported countries: egypt, saudi-arabia, united-arab-emirates, qatar, kuwait, bahrain, oman, jordan, morocco, tunisia
