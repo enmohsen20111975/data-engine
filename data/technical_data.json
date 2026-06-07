@@ -1,0 +1,164 @@
+[
+  {
+    "ticker": "EGX:COMI",
+    "name": "Commercial International Bank",
+    "market": "مصر",
+    "price": 132.23,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "EGX:ETEL",
+    "name": "Telecom Egypt",
+    "market": "مصر",
+    "price": 0,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "EGX:HRHO",
+    "name": "Heliopolis Housing",
+    "market": "مصر",
+    "price": 26.8,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "EGX:EAST",
+    "name": "Eastern Company",
+    "market": "مصر",
+    "price": 38.96,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "EGX:SWDY",
+    "name": "Elsewedy Electric",
+    "market": "مصر",
+    "price": 87.67,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "EGX:AMOC",
+    "name": "Alexandria Mineral Oils",
+    "market": "مصر",
+    "price": 8.25,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "EGX:ESRS",
+    "name": "Ezz Steel",
+    "market": "مصر",
+    "price": 0,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "EGX:FWRY",
+    "name": "Fawry",
+    "market": "مصر",
+    "price": 19.15,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "KUWAIT:NBK",
+    "name": "National Bank of Kuwait",
+    "market": "الكويت",
+    "price": 0,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "KUWAIT:KFH",
+    "name": "Kuwait Finance House",
+    "market": "الكويت",
+    "price": 0,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "KUWAIT:ZAIN",
+    "name": "Zain",
+    "market": "الكويت",
+    "price": 0,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "KUWAIT:OORED",
+    "name": "Ooredoo",
+    "market": "الكويت",
+    "price": 0,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "KUWAIT:AGON",
+    "name": "Agility",
+    "market": "الكويت",
+    "price": 0,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "QATAR:QNB",
+    "name": "Qatar National Bank",
+    "market": "قطر",
+    "price": 0,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "QATAR:MAS",
+    "name": "Masraf Al Rayan",
+    "market": "قطر",
+    "price": 0,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "QATAR:QIBK",
+    "name": "Qatar Islamic Bank",
+    "market": "قطر",
+    "price": 0,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "QATAR:OORE",
+    "name": "Ooredoo Qatar",
+    "market": "قطر",
+    "price": 0,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  },
+  {
+    "ticker": "QATAR:INDO",
+    "name": "Industries Qatar",
+    "market": "قطر",
+    "price": 0,
+    "rsi": null,
+    "macd": null,
+    "recommendation": "NEUTRAL"
+  }
+]

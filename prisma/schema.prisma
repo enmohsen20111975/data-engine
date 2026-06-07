@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,20 +10,112 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Stock {
+  id            Int       @id @default(autoincrement())
+  symbol        String
+  name          String?
+  price         Float?
+  changePercent Float?    @map("change_percent")
+  volume        String?
+  marketCap     String?   @map("market_cap")
+  market        String?
+  createdAt     DateTime? @default(now()) @map("created_at")
+
+  @@map("stocks")
 }
 
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model StockPrice {
+  id            Int      @id @default(autoincrement())
+  timestamp     String
+  symbol        String
+  name          String?
+  price         Float?
+  changePercent Float?   @map("change_percent")
+  volume        String?
+  marketCap     String?  @map("market_cap")
+  market        String?
+
+  @@unique([timestamp, symbol])
+  @@map("stock_prices")
+}
+
+model HistoricalData {
+  id         Int     @id @default(autoincrement())
+  symbol     String
+  name       String?
+  market     String?
+  date       String
+  open       Float?
+  high       Float?
+  low        Float?
+  close      Float?
+  volume     Int?
+  lastFetch  String? @map("last_fetch")
+
+  @@unique([symbol, date])
+  @@map("historical_data")
+}
+
+model GoldPrice {
+  id             Int     @id @default(autoincrement())
+  timestamp      String
+  country        String
+  currency       String
+  karat          String
+  pricePerGram   Float?  @map("price_per_gram")
+  pricePerOunce  Float?  @map("price_per_ounce")
+
+  @@unique([timestamp, country, karat])
+  @@map("gold_prices")
+}
+
+model SilverPrice {
+  id             Int     @id @default(autoincrement())
+  timestamp      String
+  country        String
+  currency       String
+  pricePerGram   Float?  @map("price_per_gram")
+  pricePerOunce  Float?  @map("price_per_ounce")
+
+  @@unique([timestamp, country])
+  @@map("silver_prices")
+}
+
+model ExchangeRate {
+  id         Int     @id @default(autoincrement())
+  timestamp  String
+  currency   String
+  rateToUsd  Float?  @map("rate_to_usd")
+
+  @@unique([timestamp, currency])
+  @@map("exchange_rates")
+}
+
+model CryptoPrice {
+  id               Int     @id @default(autoincrement())
+  timestamp        String
+  rank             Int?
+  symbol           String
+  name             String?
+  priceUsd         Float?  @map("price_usd")
+  priceChange24h   Float?  @map("price_change_24h")
+  priceChange7d    Float?  @map("price_change_7d")
+  marketCap        Float?  @map("market_cap")
+  marketCapRank    Int?    @map("market_cap_rank")
+  totalVolume      Float?  @map("total_volume")
+  circulatingSupply Float? @map("circulating_supply")
+
+  @@unique([timestamp, symbol])
+  @@map("crypto_prices")
+}
+
+model BtcLocalPrice {
+  id        Int     @id @default(autoincrement())
+  timestamp String
+  currency  String
+  price     Float?
+  change24h Float?  @map("change_24h")
+
+  @@unique([timestamp, currency])
+  @@map("btc_local_prices")
 }
