@@ -1,0 +1,47 @@
+[
+  {
+    "url": "https://www.marketaux.com",
+    "name": "marketaux: Free stock market and finance news API",
+    "snippet": "Free finance and stock market news and analysis API in JSON format for over 80 markets and over 5000 sources.",
+    "host_name": "www.marketaux.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.marketaux.com/documentation",
+    "name": "API Documentation | marketaux",
+    "snippet": "Get free and fast access to finance and market news in JSON format via REST API endpoints. See the documentation to see how easy it is to use.",
+    "host_name": "www.marketaux.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.marketaux.com/news/entity/KEYS",
+    "name": "KEYS - Keysight Technologies, Inc. News Data API - marketaux",
+    "snippet": "Get instant access to all of our market news and analysis with our free REST API. Utilities About Us marketaux provides financial news and analysis for global ...",
+    "host_name": "www.marketaux.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://freeapihub.com/apis/marketaux",
+    "name": "Marketaux Financial News API - Free Real-Time  - FreeAPIHub",
+    "snippet": "The Marketaux Financial News API provides developers with free access to structured financial news and sentiment scoring, ideal for fintech and ...",
+    "host_name": "freeapihub.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://finnhub.io/docs/api/market-news",
+    "name": "Real-time Market News API - Finnhub",
+    "snippet": "Finnhub - Free stock API for realtime market data, global company fundamentals, economic data, and alternative data.",
+    "host_name": "finnhub.io",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  }
+]

@@ -1,0 +1,47 @@
+[
+  {
+    "url": "https://gnews.io",
+    "name": "GNews API: Simple News API for Developers",
+    "snippet": "Free. €0. For development and testing purposes ; Essential. €49.99/month. For production and published commercial projects ; Business. €99.99/month. For larger ...",
+    "host_name": "gnews.io",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://gnews.io/pricing",
+    "name": "Pricing - GNews API",
+    "snippet": "Start your 10-day free trial today. ; Free. €0. For development and testing purposes ; Essential. €49.99/month. For production and published commercial projects ...",
+    "host_name": "gnews.io",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://gnews.io/why-choose-gnews-api-over-news-api-or-newsapiai",
+    "name": "Why Choose GNews API Over News API or NewsAPI.ai?",
+    "snippet": "It offers a robust but limited free tier and comprehensive documentation ... Perfect for financial services, business intelligence, and mission ...",
+    "host_name": "gnews.io",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://aws.amazon.com/marketplace/pp/prodview-xwgvhwowjmw3g",
+    "name": "AWS Marketplace: Benzinga Basic Financial News API (free tier)",
+    "snippet": "The fee-free tier of the Benzinga Basic News API makes adding Benzinga's institutional grade financial news to your website or application easier than ever!",
+    "host_name": "aws.amazon.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.marketaux.com",
+    "name": "marketaux: Free stock market and finance news API",
+    "snippet": "Instant access to global stock market and finance news also including funds, crypto and more along with comprehensive sentiment analysis.",
+    "host_name": "www.marketaux.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  }
+]

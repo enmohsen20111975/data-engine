@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://www.saudiexchange.sa/wps/portal/saudiexchange/trading/market-services/market-information-services/market-data",
+    "name": "Market Data - Saudi Exchange",
+    "snippet": "The Saudi Exchange provides comprehensive market data services related to all trading activities on the multiple asset classes listed on the Saudi Exchange.",
+    "host_name": "www.saudiexchange.sa",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://developer.ice.com/fixed-income-data-services/catalog/saudi-stock-exchange-tadawul",
+    "name": "Saudi Stock Exchange (Tadawul) - ICE Developer Portal",
+    "snippet": "Saudi Exchange operates as a subsidiary of the Saudi Tadawul Group. We provide streaming data for bonds, equities and funds, and indices optimized API and ...",
+    "host_name": "developer.ice.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.lexisnexis.com/en-ae/daas/nexis-daas/stock-news-api",
+    "name": "Stock News API | LexisNexis Middle East",
+    "snippet": "(DaaS) (DaaS) stock news API. This tool scrapes relevant information like share prices, sales volumes, and even sentiment. DaaS stock market API, to ...",
+    "host_name": "www.lexisnexis.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.marketwatch.com/site/rss",
+    "name": "RSS Feeds for MarketWatch",
+    "snippet": "MarketWatch is providing some of its popular news feeds in RSS format for personal, non-commercial use by individuals only.",
+    "host_name": "www.marketwatch.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.argaam.com/en/rss",
+    "name": "RSS Feeds List",
+    "snippet": "THARWAH 9613 - Companies Quotes Market Data Calendar Trading Data Investor by nationality. Financial Data Financial Reports Quarterly Results. Saudi Consumer ...",
+    "host_name": "www.argaam.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.nasdaqtrader.com/Trader.aspx?id=NewsRSS",
+    "name": "News and Alerts RSS Feed - Nasdaq Trader",
+    "snippet": "Customize News RSS Feed. Generate a custom News Alert RSS Feed by choosing one criteria or a combination of the criteria below.",
+    "host_name": "www.nasdaqtrader.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.reddit.com/r/algotrading/comments/1grvz9r/recommendation_for_stock_news_api",
+    "name": "Recommendation for stock news API? : r/algotrading - Reddit",
+    "snippet": "Stock News API: https://stocknewsapi.com/pricing. You could also just build your own list of RSS feeds and poll them. Free news source of stock ...",
+    "host_name": "www.reddit.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://stocknewsapi.com",
+    "name": "Stock News API - A JSON API for Stock Market and Financial News",
+    "snippet": "Get the latest stock news from the best news sources. Use our API and access clean and relevant stock market news data. Get API key.",
+    "host_name": "stocknewsapi.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://finnhub.io/docs/api/market-news",
+    "name": "Real-time Market News API - Finnhub",
+    "snippet": "Finnhub - Free stock API for realtime market data, global company fundamentals, economic data, and alternative data.",
+    "host_name": "finnhub.io",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.benzinga.com/apis/cloud-product/stock-news-api",
+    "name": "Stock Market Newswire - Benzinga APIs",
+    "snippet": "Our APIs offer a variety of ways to integrate news data, including REST API, TCP streaming, and RSS feeds. Stock news APIs have never been easier to implement ...",
+    "host_name": "www.benzinga.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

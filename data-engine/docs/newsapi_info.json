@@ -1,0 +1,47 @@
+[
+  {
+    "url": "https://newsapi.org",
+    "name": "News API – Search News and Blog Articles on the Web",
+    "snippet": "News API is a simple, easy-to-use REST API that returns JSON search results for current and historic news articles published by over 150,000 worldwide sources.",
+    "host_name": "newsapi.org",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://newsapi.org/pricing",
+    "name": "Pricing - News API",
+    "snippet": "Free for development, options if you're commercial. Billing yearly (20% discount). Developer $ 0 totally free, start now. Start with Developer.",
+    "host_name": "newsapi.org",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://newsdata.io",
+    "name": "NewsData.io: Best News API for Real-Time & Historical News",
+    "snippet": "Newsapi access with global news in real-time & 7+ years of archive from 97336+ sources. JSON API with sentiment & multi-language support. Free to start.",
+    "host_name": "newsdata.io",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://newsapi.ai",
+    "name": "NewsAPI.ai | Best Real-Time News API for Developers",
+    "snippet": "Easy to integrate news API that you can use in your products and services to obtain access to real-time as well as archive news content.",
+    "host_name": "newsapi.ai",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.reddit.com/r/algotrading/comments/1k8v6ma/premium_news_api",
+    "name": "Premium news api : r/algotrading - Reddit",
+    "snippet": "I am looking for real time financial news API that can provide content beyond headlines. Looking for major sources like WSJ, Bloomberg..etc.",
+    "host_name": "www.reddit.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  }
+]

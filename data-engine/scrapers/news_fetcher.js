@@ -1,0 +1,279 @@
+#!/usr/bin/env node
+/**
+ * News Fetcher for Stock Markets
+ * جالب الأخبار للأسواق المالية
+ * 
+ * Supports: Saudi Arabia, Egypt, Kuwait, Qatar
+ */
+
+const ZAI = require('z-ai-web-dev-sdk').default;
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+
+// Database path
+const DB_PATH = path.join(__dirname, '..', 'data', 'data_engine.db');
+
+// Markets configuration
+const MARKETS = {
+    saudi: {
+        name: 'السعودية',
+        exchange: 'Tadawul',
+        queries: [
+            'Tadawul Saudi stock market TASI news',
+            'Saudi Arabia stock exchange companies IPO',
+            'Argaam Saudi financial news Tadawul'
+        ]
+    },
+    egypt: {
+        name: 'مصر',
+        exchange: 'EGX',
+        queries: [
+            'EGX Egypt stock market news today',
+            'Egyptian exchange EGX30 companies trading',
+            'Egypt stock market financial news'
+        ]
+    },
+    kuwait: {
+        name: 'الكويت',
+        exchange: 'KSE',
+        queries: [
+            'Kuwait stock exchange KSE market news',
+            'Boursa Kuwait trading companies stocks',
+            'Kuwait financial market news today'
+        ]
+    },
+    qatar: {
+        name: 'قطر',
+        exchange: 'QSE',
+        queries: [
+            'Qatar Stock Exchange QSE market news',
+            'Qatar financial market QE index stocks',
+            'Doha stock exchange trading news'
+        ]
+    }
+};
+
+let zai = null;
+let db = null;
+
+async function initialize() {
+    // Initialize Z-AI
+    zai = await ZAI.create();
+    console.log('✓ Z-AI initialized');
+    
+    // Initialize database
+    return new Promise((resolve, reject) => {
+        db = new sqlite3.Database(DB_PATH, (err) => {
+            if (err) reject(err);
+            else {
+                createNewsTable();
+                resolve();
+            }
+        });
+    });
+}
+
+function createNewsTable() {
+    db.run(`
+        CREATE TABLE IF NOT EXISTS market_news (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            url TEXT UNIQUE,
+            snippet TEXT,
+            source TEXT,
+            market TEXT,
+            search_query TEXT,
+            published_date TEXT,
+            sentiment TEXT,
+            fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+    console.log('✓ News table ready');
+}
+
+async function searchNews(query, numResults = 10, recencyDays = 7) {
+    try {
+        const results = await zai.functions.invoke('web_search', {
+            query: query,
+            num: numResults,
+            recency_days: recencyDays
+        });
+        
+        return results || [];
+    } catch (error) {
+        console.error(`Error searching "${query}": ${error.message}`);
+        return [];
+    }
+}
+
+function saveNewsToDb(items, market, query) {
+    return new Promise((resolve, reject) => {
+        if (!items || items.length === 0) {
+            resolve(0);
+            return;
+        }
+        
+        const stmt = db.prepare(`
+            INSERT OR IGNORE INTO market_news 
+            (title, url, snippet, source, market, search_query, published_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        
+        let savedCount = 0;
+        let pending = items.length;
+        
+        for (const item of items) {
+            stmt.run(
+                item.name || '',
+                item.url || '',
+                item.snippet || '',
+                item.host_name || '',
+                market,
+                query,
+                item.date || '',
+                (err) => {
+                    if (!err) savedCount++;
+                    pending--;
+                    if (pending === 0) {
+                        stmt.finalize();
+                        resolve(savedCount);
+                    }
+                }
+            );
+        }
+    });
+}
+
+async function fetchAllNews(recencyDays = 7) {
+    console.log('='.repeat(60));
+    console.log('Starting news fetcher...');
+    console.log(`Time: ${new Date().toISOString()}`);
+    console.log('='.repeat(60));
+    
+    let totalSaved = 0;
+    
+    for (const [marketKey, marketInfo] of Object.entries(MARKETS)) {
+        console.log(`\n--- ${marketInfo.name} (${marketInfo.exchange}) ---`);
+        
+        for (const query of marketInfo.queries) {
+            console.log(`  Searching: ${query}`);
+            
+            const items = await searchNews(query, 10, recencyDays);
+            
+            if (items.length > 0) {
+                const saved = await saveNewsToDb(items, marketKey, query);
+                totalSaved += saved;
+                console.log(`    Found ${items.length}, saved ${saved} new`);
+            } else {
+                console.log(`    No results`);
+            }
+            
+            // Small delay between searches
+            await new Promise(r => setTimeout(r, 500));
+        }
+    }
+    
+    console.log('\n' + '='.repeat(60));
+    console.log(`Total new items saved: ${totalSaved}`);
+    console.log('='.repeat(60));
+    
+    return totalSaved;
+}
+
+function getNewsStats() {
+    return new Promise((resolve, reject) => {
+        const stats = {
+            total: 0,
+            byMarket: {},
+            topSources: {},
+            recentNews: []
+        };
+        
+        // Get total count
+        db.get('SELECT COUNT(*) as count FROM market_news', (err, row) => {
+            if (row) stats.total = row.count;
+        });
+        
+        // Get count by market
+        db.all(`
+            SELECT market, COUNT(*) as count 
+            FROM market_news 
+            GROUP BY market 
+            ORDER BY count DESC
+        `, (err, rows) => {
+            if (rows) {
+                rows.forEach(r => stats.byMarket[r.market] = r.count);
+            }
+        });
+        
+        // Get top sources
+        db.all(`
+            SELECT source, COUNT(*) as count 
+            FROM market_news 
+            GROUP BY source 
+            ORDER BY count DESC 
+            LIMIT 10
+        `, (err, rows) => {
+            if (rows) {
+                rows.forEach(r => stats.topSources[r.source] = r.count);
+            }
+            
+            // Get recent news
+            db.all(`
+                SELECT title, url, snippet, source, market, fetched_at 
+                FROM market_news 
+                ORDER BY fetched_at DESC 
+                LIMIT 20
+            `, (err, rows) => {
+                if (rows) stats.recentNews = rows;
+                resolve(stats);
+            });
+        });
+    });
+}
+
+function close() {
+    if (db) {
+        db.close();
+    }
+}
+
+// Main
+async function main() {
+    const args = process.argv.slice(2);
+    const command = args[0] || '--fetch';
+    const days = parseInt(args.find(a => a.startsWith('--days='))?.split('=')[1]) || 7;
+    
+    try {
+        await initialize();
+        
+        if (command === '--stats') {
+            const stats = await getNewsStats();
+            console.log('\n=== News Statistics ===');
+            console.log(`Total news: ${stats.total}`);
+            console.log('\nBy market:', stats.byMarket);
+            console.log('\nTop sources:', stats.topSources);
+            
+            if (stats.recentNews.length > 0) {
+                console.log('\n=== Recent News ===');
+                stats.recentNews.slice(0, 5).forEach((item, i) => {
+                    console.log(`\n${i + 1}. [${item.market}] ${item.title}`);
+                    console.log(`   ${item.snippet?.substring(0, 100)}...`);
+                });
+            }
+        } else {
+            await fetchAllNews(days);
+            
+            // Show stats after fetching
+            const stats = await getNewsStats();
+            console.log(`\nTotal news in database: ${stats.total}`);
+        }
+        
+    } catch (error) {
+        console.error('Error:', error.message);
+    } finally {
+        close();
+    }
+}
+
+main();
