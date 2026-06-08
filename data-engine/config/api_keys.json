@@ -1,0 +1,32 @@
+{
+  "newsapi": {
+    "key": "7d0c4faeed054d309e2b8000477a1394",
+    "url": "https://newsapi.org",
+    "dashboard": "https://newsapi.org/account",
+    "limit": "100 requests/day"
+  },
+  "gnews": {
+    "key": "7e1d66c3e587a39477614dbdcc751b7f",
+    "url": "https://gnews.io",
+    "dashboard": "https://gnews.io/dashboard",
+    "limit": "100 requests/day"
+  },
+  "alphavantage": {
+    "key": "53RL0PG35D3F91WS",
+    "url": "https://www.alphavantage.co",
+    "dashboard": "https://www.alphavantage.co/support/#api-key",
+    "limit": "25 requests/day"
+  },
+  "mediastack": {
+    "key": "a054c0bafec53d76025ca817937d613e",
+    "url": "https://mediastack.com",
+    "dashboard": "https://mediastack.com/product",
+    "limit": "500 requests/month"
+  },
+  "currentsapi": {
+    "key": "wpbSJxv8Utt4okTXKn9QK3yZwcGmwVeQQrtEhPXj9QDEDpkK",
+    "url": "https://currentsapi.services",
+    "dashboard": "https://currentsapi.services/en/register",
+    "limit": "200 requests/day"
+  }
+}

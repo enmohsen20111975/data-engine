@@ -1,87 +1,280 @@
 #!/usr/bin/env node
 /* eslint-disable @typescript-eslint/no-require-imports */
 /**
- * News Fetcher for Stock Markets
- * جالب الأخبار للأسواق المالية
+ * News Fetcher for Stock Markets - Production Version
+ * جالب الأخبار للأسواق المالية - نسخة الإنتاج
+ * 
+ * Uses multiple News APIs with fallback:
+ * 1. NewsAPI.org (100 req/day)
+ * 2. GNews (100 req/day)
+ * 3. Currents API (200 req/day)
+ * 4. MediaStack (500 req/month)
  * 
  * Supports: Saudi Arabia, Egypt, Kuwait, Qatar
  */
 
-const ZAI = require('z-ai-web-dev-sdk').default;
+const https = require('https');
+const http = require('http');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 
 // Database path
 const DB_PATH = path.join(__dirname, '..', 'data', 'data_engine.db');
+const CONFIG_PATH = path.join(__dirname, '..', 'config', 'api_keys.json');
 
-// Markets configuration - Arabic queries for Arabic news
+// Load API keys
+const API_KEYS = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+
+// Markets configuration - Arabic & English queries
 const MARKETS = {
     saudi: {
         name: 'السعودية',
         exchange: 'Tadawul',
         queries: [
-            'site:argaam.com أخبار تداول أسهم السعودية',
-            'site:mubasher.info السعودية أخبار الأسهم',
-            'أخبار مالية السعودية ارتفاع انخفاض أسهم',
-            'نتائج أعمال الشركات السعودية ربع سنوي',
-            'توزيعات أرباح الشركات السعودية 2024'
+            'Saudi stock market TASI news',
+            'Tadawul Saudi Arabia financial',
+            'Aramco Saudi dividend'
         ]
     },
     egypt: {
         name: 'مصر',
         exchange: 'EGX',
         queries: [
-            'site:mubasher.info مصر أخبار البورصة',
-            'أخبار البورصة المصرية ارتفاع انخفاض',
-            'نتائج أعمال الشركات المصرية',
-            'توصيات أسهم مصرية تحليل فني',
-            'توزيعات أرباح الشركات المصرية'
+            'Egypt stock market EGX news',
+            'Egyptian Exchange Cairo financial'
         ]
     },
     kuwait: {
         name: 'الكويت',
         exchange: 'KSE',
         queries: [
-            'site:mubasher.info الكويت أخبار بورصة',
-            'أخبار بورصة الكويت ارتفاع انخفاض',
-            'نتائج أعمال الشركات الكويتية',
-            'توزيعات أرباح الشركات الكويتية'
+            'Kuwait stock exchange Boursa news',
+            'Kuwait financial market'
         ]
     },
     qatar: {
         name: 'قطر',
         exchange: 'QSE',
         queries: [
-            'site:mubasher.info قطر أخبار بورصة',
-            'أخبار بورصة قطر ارتفاع انخفاض',
-            'نتائج أعمال الشركات القطرية',
-            'توزيعات أرباح الشركات القطرية'
+            'Qatar stock exchange QSE news',
+            'Qatar financial market Doha'
         ]
     }
 };
 
-let zai = null;
+// API Providers
+const PROVIDERS = [
+    {
+        name: 'NewsAPI',
+        fetch: fetchFromNewsAPI,
+        priority: 1
+    },
+    {
+        name: 'GNews',
+        fetch: fetchFromGNews,
+        priority: 2
+    },
+    {
+        name: 'CurrentsAPI',
+        fetch: fetchFromCurrentsAPI,
+        priority: 3
+    },
+    {
+        name: 'MediaStack',
+        fetch: fetchFromMediaStack,
+        priority: 4
+    }
+];
+
 let db = null;
+let requestCount = {};
 
-// Cache for news (1 hour)
-const newsCache = new Map();
-const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+// ============================================
+// HTTP Helper with User-Agent
+// ============================================
+function makeRequest(url) {
+    return new Promise((resolve, reject) => {
+        const urlObj = new URL(url);
+        const client = urlObj.protocol === 'https:' ? https : http;
+        
+        const options = {
+            hostname: urlObj.hostname,
+            path: urlObj.pathname + urlObj.search,
+            method: 'GET',
+            headers: {
+                'User-Agent': 'DataEngine/1.0 (Financial News Aggregator)',
+                'Accept': 'application/json'
+            }
+        };
+        
+        const req = client.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    resolve(JSON.parse(data));
+                } catch (e) {
+                    reject(new Error('Invalid JSON response'));
+                }
+            });
+        });
+        
+        req.on('error', reject);
+        req.end();
+    });
+}
 
-// Rate limiting
-const requestTimes = [];
-const MAX_REQUESTS_PER_MINUTE = 30;
-
-async function initialize() {
-    // Initialize Z-AI
-    zai = await ZAI.create();
-    console.log('✓ Z-AI initialized');
+// ============================================
+// NewsAPI.org
+// ============================================
+async function fetchFromNewsAPI(query) {
+    const apiKey = API_KEYS.newsapi.key;
+    const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&language=en&sortBy=publishedAt&pageSize=10&apiKey=${apiKey}`;
     
-    // Initialize database
+    requestCount['newsapi'] = (requestCount['newsapi'] || 0) + 1;
+    console.log(`  [NewsAPI] Request #${requestCount['newsapi']}`);
+    
+    try {
+        const data = await makeRequest(url);
+        
+        if (data.status === 'ok' && data.articles && data.articles.length > 0) {
+            return data.articles.map(article => ({
+                title: article.title,
+                url: article.url,
+                snippet: article.description,
+                source: article.source?.name || 'NewsAPI',
+                published_date: article.publishedAt
+            }));
+        }
+        
+        console.log(`    NewsAPI: ${data.totalResults || 0} results`);
+        return [];
+    } catch (error) {
+        throw new Error(`NewsAPI: ${error.message}`);
+    }
+}
+
+// ============================================
+// GNews API
+// ============================================
+async function fetchFromGNews(query) {
+    const apiKey = API_KEYS.gnews.key;
+    const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&max=10&apikey=${apiKey}`;
+    
+    requestCount['gnews'] = (requestCount['gnews'] || 0) + 1;
+    console.log(`  [GNews] Request #${requestCount['gnews']}`);
+    
+    try {
+        const data = await makeRequest(url);
+        
+        if (data.articles && data.articles.length > 0) {
+            return data.articles.map(article => ({
+                title: article.title,
+                url: article.url,
+                snippet: article.description,
+                source: article.source?.name || 'GNews',
+                published_date: article.publishedAt
+            }));
+        }
+        
+        console.log(`    GNews: ${data.totalArticles || 0} results`);
+        return [];
+    } catch (error) {
+        throw new Error(`GNews: ${error.message}`);
+    }
+}
+
+// ============================================
+// Currents API
+// ============================================
+async function fetchFromCurrentsAPI(query) {
+    const apiKey = API_KEYS.currentsapi.key;
+    const url = `https://api.currentsapi.services/v1/search?keywords=${encodeURIComponent(query)}&language=en&limit=10&apiKey=${apiKey}`;
+    
+    requestCount['currentsapi'] = (requestCount['currentsapi'] || 0) + 1;
+    console.log(`  [CurrentsAPI] Request #${requestCount['currentsapi']}`);
+    
+    try {
+        const data = await makeRequest(url);
+        
+        if (data.news && data.news.length > 0) {
+            return data.news.map(article => ({
+                title: article.title,
+                url: article.url,
+                snippet: article.description,
+                source: article.author || 'CurrentsAPI',
+                published_date: article.published
+            }));
+        }
+        
+        console.log(`    CurrentsAPI: No results`);
+        return [];
+    } catch (error) {
+        throw new Error(`CurrentsAPI: ${error.message}`);
+    }
+}
+
+// ============================================
+// MediaStack API
+// ============================================
+async function fetchFromMediaStack(query) {
+    const apiKey = API_KEYS.mediastack.key;
+    const url = `http://api.mediastack.com/v1/news?keywords=${encodeURIComponent(query)}&languages=en&limit=10&access_key=${apiKey}`;
+    
+    requestCount['mediastack'] = (requestCount['mediastack'] || 0) + 1;
+    console.log(`  [MediaStack] Request #${requestCount['mediastack']}`);
+    
+    try {
+        const data = await makeRequest(url);
+        
+        if (data.data && data.data.length > 0) {
+            return data.data.map(article => ({
+                title: article.title,
+                url: article.url,
+                snippet: article.description,
+                source: article.source || 'MediaStack',
+                published_date: article.published_at
+            }));
+        }
+        
+        console.log(`    MediaStack: No results`);
+        return [];
+    } catch (error) {
+        throw new Error(`MediaStack: ${error.message}`);
+    }
+}
+
+// ============================================
+// Smart Fetch with Fallback
+// ============================================
+async function searchNewsWithFallback(query) {
+    // Try each provider in order
+    for (const provider of PROVIDERS) {
+        try {
+            const results = await provider.fetch(query);
+            if (results && results.length > 0) {
+                console.log(`  ✓ Got ${results.length} results from ${provider.name}`);
+                return { provider: provider.name, results };
+            }
+        } catch (error) {
+            console.log(`  ✗ ${provider.name} failed: ${error.message}`);
+        }
+    }
+    
+    return { provider: null, results: [] };
+}
+
+// ============================================
+// Database Functions
+// ============================================
+function initialize() {
     return new Promise((resolve, reject) => {
         db = new sqlite3.Database(DB_PATH, (err) => {
             if (err) reject(err);
             else {
                 createNewsTable();
+                console.log('✓ Database initialized');
                 resolve();
             }
         });
@@ -99,83 +292,14 @@ function createNewsTable() {
             market TEXT,
             search_query TEXT,
             published_date TEXT,
-            sentiment TEXT,
+            provider TEXT,
             fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     `);
-    console.log('✓ News table ready');
 }
 
-async function checkRateLimit() {
-    const now = Date.now();
-    const oneMinuteAgo = now - 60000;
-    
-    // Remove old requests
-    while (requestTimes.length > 0 && requestTimes[0] < oneMinuteAgo) {
-        requestTimes.shift();
-    }
-    
-    if (requestTimes.length >= MAX_REQUESTS_PER_MINUTE) {
-        const waitTime = 60000 - (now - requestTimes[0]);
-        console.log(`Rate limit reached. Waiting ${Math.ceil(waitTime/1000)}s...`);
-        await new Promise(r => setTimeout(r, waitTime));
-        return checkRateLimit();
-    }
-    
-    requestTimes.push(now);
-}
-
-async function searchNews(query, numResults = 10, recencyDays = 7) {
-    try {
-        // Check cache first
-        const cacheKey = `${query}_${numResults}_${recencyDays}`;
-        const cached = newsCache.get(cacheKey);
-        
-        if (cached && (Date.now() - cached.time) < CACHE_DURATION) {
-            console.log(`  (Using cached results for: ${query})`);
-            return cached.data;
-        }
-        
-        // Rate limit check
-        await checkRateLimit();
-        
-        // Retry logic
-        let retries = 3;
-        let results = null;
-        
-        while (retries > 0 && !results) {
-            try {
-                results = await zai.functions.invoke('web_search', {
-                    query: query,
-                    num: numResults,
-                    recency_days: recencyDays
-                });
-            } catch (e) {
-                retries--;
-                if (retries > 0) {
-                    console.log(`  Retry ${3-retries}/3...`);
-                    await new Promise(r => setTimeout(r, 1000));
-                }
-            }
-        }
-        
-        // Cache the results
-        if (results && results.length > 0) {
-            newsCache.set(cacheKey, {
-                data: results,
-                time: Date.now()
-            });
-        }
-        
-        return results || [];
-    } catch (error) {
-        console.error(`Error searching "${query}": ${error.message}`);
-        return [];
-    }
-}
-
-function saveNewsToDb(items, market, query) {
-    return new Promise((resolve, reject) => {
+function saveNewsToDb(items, market, query, provider) {
+    return new Promise((resolve) => {
         if (!items || items.length === 0) {
             resolve(0);
             return;
@@ -183,8 +307,8 @@ function saveNewsToDb(items, market, query) {
         
         const stmt = db.prepare(`
             INSERT OR IGNORE INTO market_news 
-            (title, url, snippet, source, market, search_query, published_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (title, url, snippet, source, market, search_query, published_date, provider)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `);
         
         let savedCount = 0;
@@ -192,13 +316,14 @@ function saveNewsToDb(items, market, query) {
         
         for (const item of items) {
             stmt.run(
-                item.name || '',
+                item.title || '',
                 item.url || '',
                 item.snippet || '',
-                item.host_name || '',
+                item.source || '',
                 market,
                 query,
-                item.date || '',
+                item.published_date || '',
+                provider,
                 (err) => {
                     if (!err) savedCount++;
                     pending--;
@@ -212,92 +337,58 @@ function saveNewsToDb(items, market, query) {
     });
 }
 
-async function fetchAllNews(recencyDays = 7) {
+// ============================================
+// Main Fetch Function
+// ============================================
+async function fetchAllNews() {
     console.log('='.repeat(60));
-    console.log('Starting news fetcher...');
-    console.log(`Time: ${new Date().toISOString()}`);
+    console.log('📰 News Fetcher - Production Version');
+    console.log(`📅 Time: ${new Date().toISOString()}`);
     console.log('='.repeat(60));
     
     let totalSaved = 0;
+    const stats = {};
     
     for (const [marketKey, marketInfo] of Object.entries(MARKETS)) {
-        console.log(`\n--- ${marketInfo.name} (${marketInfo.exchange}) ---`);
+        console.log(`\n🌍 ${marketInfo.name} (${marketInfo.exchange})`);
+        stats[marketKey] = { total: 0, byProvider: {} };
         
         for (const query of marketInfo.queries) {
-            console.log(`  Searching: ${query}`);
+            console.log(`  🔍 Searching: ${query}`);
             
-            const items = await searchNews(query, 10, recencyDays);
+            const { provider, results } = await searchNewsWithFallback(query);
             
-            if (items.length > 0) {
-                const saved = await saveNewsToDb(items, marketKey, query);
+            if (results.length > 0) {
+                const saved = await saveNewsToDb(results, marketKey, query, provider);
                 totalSaved += saved;
-                console.log(`    Found ${items.length}, saved ${saved} new`);
+                stats[marketKey].total += saved;
+                stats[marketKey].byProvider[provider] = (stats[marketKey].byProvider[provider] || 0) + saved;
+                console.log(`    💾 Saved ${saved} articles`);
             } else {
-                console.log(`    No results`);
+                console.log(`    ❌ No results`);
             }
             
-            // Small delay between searches
-            await new Promise(r => setTimeout(r, 500));
+            // Delay to avoid rate limits (1 second)
+            await new Promise(r => setTimeout(r, 1000));
         }
     }
     
+    // Print summary
     console.log('\n' + '='.repeat(60));
-    console.log(`Total new items saved: ${totalSaved}`);
+    console.log('📊 SUMMARY');
+    console.log('='.repeat(60));
+    console.log(`\n✅ Total saved: ${totalSaved} articles`);
+    console.log('\n📈 API Usage:');
+    for (const [api, count] of Object.entries(requestCount)) {
+        console.log(`   ${api}: ${count} requests`);
+    }
+    console.log('\n📂 By Market:');
+    for (const [market, data] of Object.entries(stats)) {
+        console.log(`   ${market}: ${data.total} articles`);
+    }
     console.log('='.repeat(60));
     
     return totalSaved;
-}
-
-function getNewsStats() {
-    return new Promise((resolve, reject) => {
-        const stats = {
-            total: 0,
-            byMarket: {},
-            topSources: {},
-            recentNews: []
-        };
-        
-        // Get total count
-        db.get('SELECT COUNT(*) as count FROM market_news', (err, row) => {
-            if (row) stats.total = row.count;
-        });
-        
-        // Get count by market
-        db.all(`
-            SELECT market, COUNT(*) as count 
-            FROM market_news 
-            GROUP BY market 
-            ORDER BY count DESC
-        `, (err, rows) => {
-            if (rows) {
-                rows.forEach(r => stats.byMarket[r.market] = r.count);
-            }
-        });
-        
-        // Get top sources
-        db.all(`
-            SELECT source, COUNT(*) as count 
-            FROM market_news 
-            GROUP BY source 
-            ORDER BY count DESC 
-            LIMIT 10
-        `, (err, rows) => {
-            if (rows) {
-                rows.forEach(r => stats.topSources[r.source] = r.count);
-            }
-            
-            // Get recent news
-            db.all(`
-                SELECT title, url, snippet, source, market, fetched_at 
-                FROM market_news 
-                ORDER BY fetched_at DESC 
-                LIMIT 20
-            `, (err, rows) => {
-                if (rows) stats.recentNews = rows;
-                resolve(stats);
-            });
-        });
-    });
 }
 
 function close() {
@@ -306,41 +397,51 @@ function close() {
     }
 }
 
-// Main
+// ============================================
+// CLI
+// ============================================
 async function main() {
     const args = process.argv.slice(2);
     const command = args[0] || '--fetch';
-    const days = parseInt(args.find(a => a.startsWith('--days='))?.split('=')[1]) || 7;
     
     try {
         await initialize();
         
         if (command === '--stats') {
-            const stats = await getNewsStats();
-            console.log('\n=== News Statistics ===');
-            console.log(`Total news: ${stats.total}`);
-            console.log('\nBy market:', stats.byMarket);
-            console.log('\nTop sources:', stats.topSources);
+            // Show stats
+            db.get('SELECT COUNT(*) as count FROM market_news', (err, row) => {
+                console.log(`Total news: ${row?.count || 0}`);
+            });
             
-            if (stats.recentNews.length > 0) {
-                console.log('\n=== Recent News ===');
-                stats.recentNews.slice(0, 5).forEach((item, i) => {
-                    console.log(`\n${i + 1}. [${item.market}] ${item.title}`);
-                    console.log(`   ${item.snippet?.substring(0, 100)}...`);
+            db.all(`
+                SELECT market, provider, COUNT(*) as count 
+                FROM market_news 
+                GROUP BY market, provider
+            `, (err, rows) => {
+                console.log('\nBy Market & Provider:');
+                rows?.forEach(r => {
+                    console.log(`  ${r.market} (${r.provider}): ${r.count}`);
                 });
+                close();
+            });
+        } else if (command === '--keys') {
+            // Show API keys info
+            console.log('\n🔑 API Keys:');
+            for (const [name, info] of Object.entries(API_KEYS)) {
+                console.log(`\n${name.toUpperCase()}:`);
+                console.log(`  Dashboard: ${info.dashboard}`);
+                console.log(`  Limit: ${info.limit}`);
             }
+            close();
         } else {
-            await fetchAllNews(days);
-            
-            // Show stats after fetching
-            const stats = await getNewsStats();
-            console.log(`\nTotal news in database: ${stats.total}`);
+            await fetchAllNews();
+            close();
         }
         
     } catch (error) {
-        console.error('Error:', error.message);
-    } finally {
+        console.error('❌ Error:', error.message);
         close();
+        process.exit(1);
     }
 }
 
