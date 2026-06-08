@@ -49,13 +49,13 @@ class Weights:
 @dataclass
 class Thresholds:
     """عتبات القرار حسب الشخصية"""
-    CONSERVATIVE_BUY: int = 85         # محافظ: >= 85 للشراء
-    MODERATE_BUY: int = 80
-    BALANCED_BUY: int = 75
-    GROWTH_BUY: int = 70
-    AGGRESSIVE_BUY: int = 65
-    SPECULATIVE_BUY: int = 60
-    GAMBLER_BUY: int = 55              # مقامر: >= 55
+    CONSERVATIVE_BUY: int = 60         # محافظ: >= 60 للشراء
+    MODERATE_BUY: int = 55
+    BALANCED_BUY: int = 50
+    GROWTH_BUY: int = 45
+    AGGRESSIVE_BUY: int = 40
+    SPECULATIVE_BUY: int = 35
+    GAMBLER_BUY: int = 30              # مقامر: >= 30
 
 @dataclass
 class LiquidityFilter:

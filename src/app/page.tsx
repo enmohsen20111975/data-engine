@@ -125,13 +125,13 @@ const MARKET_CONFIG: Record<string, { flag: string; color: string }> = {
 
 // Personality types
 const PERSONALITY_TYPES = [
-  { value: 'conservative', label: 'محافظ', description: 'عتبة شراء 85%', icon: Shield },
-  { value: 'moderate', label: 'معتدل', description: 'عتبة شراء 80%', icon: Shield },
-  { value: 'balanced', label: 'متوازن', description: 'عتبة شراء 75%', icon: Gauge },
-  { value: 'growth', label: 'نمو', description: 'عتبة شراء 70%', icon: TrendingUp },
-  { value: 'aggressive', label: 'عدواني', description: 'عتبة شراء 65%', icon: Zap },
-  { value: 'speculative', label: 'مضارب', description: 'عتبة شراء 60%', icon: AlertCircle },
-  { value: 'gambler', label: 'مقامر', description: 'عتبة شراء 55%', icon: AlertTriangle },
+  { value: 'conservative', label: 'محافظ', description: 'عتبة شراء 60%', icon: Shield },
+  { value: 'moderate', label: 'معتدل', description: 'عتبة شراء 55%', icon: Shield },
+  { value: 'balanced', label: 'متوازن', description: 'عتبة شراء 50%', icon: Gauge },
+  { value: 'growth', label: 'نمو', description: 'عتبة شراء 45%', icon: TrendingUp },
+  { value: 'aggressive', label: 'عدواني', description: 'عتبة شراء 40%', icon: Zap },
+  { value: 'speculative', label: 'مضارب', description: 'عتبة شراء 35%', icon: AlertCircle },
+  { value: 'gambler', label: 'مقامر', description: 'عتبة شراء 30%', icon: AlertTriangle },
 ]
 
 // Field labels

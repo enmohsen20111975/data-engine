@@ -5,6 +5,9 @@ import path from 'path'
 
 const execAsync = promisify(exec)
 
+// Use the virtual environment Python with all required packages
+const PYTHON_PATH = '/home/z/.venv/bin/python3'
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const symbol = searchParams.get('symbol')
@@ -20,13 +23,13 @@ export async function GET(request: Request) {
     
     if (action === 'market') {
       // Analyze entire market
-      command = `python3 "${scriptPath}" --action market --market "${market || ''}" --personality ${personality}`
+      command = `"${PYTHON_PATH}" "${scriptPath}" --action market --market "${market || ''}" --personality ${personality}`
     } else {
       // Analyze single stock
       if (!symbol) {
         return NextResponse.json({ error: 'Symbol is required for single analysis' }, { status: 400 })
       }
-      command = `python3 "${scriptPath}" --action analyze --symbol ${symbol} --personality ${personality}`
+      command = `"${PYTHON_PATH}" "${scriptPath}" --action analyze --symbol ${symbol} --personality ${personality}`
     }
 
     const { stdout, stderr } = await execAsync(command, {
@@ -41,6 +44,12 @@ export async function GET(request: Request) {
 
     // Parse JSON output
     try {
+      // Try to extract JSON from the output (it may be preceded by progress messages)
+      const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+        return NextResponse.json(result);
+      }
       const result = JSON.parse(stdout)
       return NextResponse.json(result)
     } catch {

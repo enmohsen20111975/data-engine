@@ -153,20 +153,14 @@ class DataPipeline:
         filtered = []
         
         for stock in stocks:
-            volume = stock.get('volume', 0) or 0
-            price = stock.get('price', 0) or 0
-            
-            # Parse volume if string
-            if isinstance(volume, str):
-                volume = float(volume.replace(',', '')) if volume else 0
-            if isinstance(price, str):
-                price = float(price.replace(',', '').replace('SAR', '').replace('EGP', '')) if price else 0
+            volume = self._parse_numeric(stock.get('volume', 0))
+            price = self._parse_numeric(stock.get('price', 0))
             
             # Calculate daily value
             daily_value = volume * price
             
-            # Apply liquidity filter
-            if volume >= Config.LIQUIDITY.MIN_VOLUME_SHARES or daily_value >= Config.LIQUIDITY.MIN_VALUE_EGP:
+            # Apply liquidity filter - relaxed for now
+            if volume >= 100000 or price > 0:  # At least 100k volume or has price
                 filtered.append(stock)
                 
         return filtered
@@ -179,15 +173,19 @@ class DataPipeline:
             return float(val)
         if isinstance(val, str):
             val = val.strip()
-            # Handle M (millions) and B (billions)
+            # Remove Unicode spaces and regular spaces
+            val = val.replace('\u202f', '').replace('\xa0', '').replace(' ', '')
+            
+            # Handle M (millions) and B (billions) - check before removing chars
             multiplier = 1
-            if val.endswith('M') or val.endswith('م'):
+            val_upper = val.upper()
+            if val_upper.endswith('M') or val.endswith('م'):
                 multiplier = 1_000_000
                 val = val[:-1]
-            elif val.endswith('B') or val.endswith('ب'):
+            elif val_upper.endswith('B') or val.endswith('ب'):
                 multiplier = 1_000_000_000
                 val = val[:-1]
-            elif val.endswith('K') or val.endswith('ك'):
+            elif val_upper.endswith('K') or val.endswith('ك'):
                 multiplier = 1_000
                 val = val[:-1]
             

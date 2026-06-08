@@ -176,14 +176,15 @@ class MasterAnalyzer:
         
         return results
     
-    def _determine_action(self, score: float, threshold: int, 
+    def _determine_action(self, score: float, threshold: int,
                          regime: MarketRegime) -> str:
         """تحديد الإجراء"""
-        # Freeze buy signals in bear market
-        if regime == MarketRegime.BEAR and score < 90:
-            return 'HOLD'
-            
-        if score >= threshold:
+        # More conservative in bear market - raise threshold by 10
+        adjusted_threshold = threshold
+        if regime == MarketRegime.BEAR:
+            adjusted_threshold = min(threshold + 10, 85)  # Cap at 85
+
+        if score >= adjusted_threshold:
             return 'BUY'
         elif score <= 30:
             return 'SELL'
