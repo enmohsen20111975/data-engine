@@ -50,5 +50,22 @@ test
 prompt
 
 server.log
+
+# Screenshots and uploads
+*.png
+/screenshots/
+/upload/
+/download/
+
+# Test files
+*-test.js
+test-*.js
+
 # Skills directory
 /skills/
+
+# Examples
+/examples/
+
+# Mini services
+/mini-services/
