@@ -6,9 +6,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Progress } from '@/components/ui/progress'
 import { 
   Database, Newspaper, Table, TrendingUp, TrendingDown,
-  ChevronLeft, ChevronRight, ExternalLink, Clock, Building2
+  ChevronLeft, ChevronRight, ExternalLink, Clock, Building2,
+  Activity, RefreshCw, HardDrive, FileSpreadsheet, CheckCircle2,
+  XCircle, AlertTriangle, Zap
 } from 'lucide-react'
 
 // Types
@@ -41,6 +44,32 @@ interface DbStats {
   totalTables: number
 }
 
+interface DatabaseReport {
+  tables: {
+    name: string
+    count: number
+    uniqueSymbols: number
+    dateRange?: { min: string; max: string }
+    lastUpdate?: string
+    markets?: { name: string; count: number }[]
+  }[]
+  totals: {
+    totalRecords: number
+    totalSymbols: number
+    tableCount: number
+  }
+  fileSize: string
+  lastChecked: string
+}
+
+interface AutoRefreshStatus {
+  running: boolean
+  interval: number
+  next_run: string | null
+  tasks: Record<string, { status: string; last_run: string; count: number }>
+  logs: { time: string; message: string; type: string }[]
+}
+
 // Market flags and colors
 const MARKET_CONFIG: Record<string, { flag: string; color: string }> = {
   'السعودية': { flag: '🇸🇦', color: 'bg-green-100 text-green-700 border-green-300' },
@@ -55,10 +84,12 @@ const MARKET_CONFIG: Record<string, { flag: string; color: string }> = {
 
 export default function Home() {
   // State
-  const [activeTab, setActiveTab] = useState('database')
+  const [activeTab, setActiveTab] = useState('dashboard')
   const [stocks, setStocks] = useState<Stock[]>([])
   const [news, setNews] = useState<NewsItem[]>([])
   const [dbStats, setDbStats] = useState<DbStats | null>(null)
+  const [dbReport, setDbReport] = useState<DatabaseReport | null>(null)
+  const [refreshStatus, setRefreshStatus] = useState<AutoRefreshStatus | null>(null)
   const [markets, setMarkets] = useState<string[]>([])
   const [selectedMarket, setSelectedMarket] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -74,6 +105,28 @@ export default function Home() {
       setDbStats(data)
     } catch (error) {
       console.error('Error fetching db stats:', error)
+    }
+  }
+
+  // Fetch database report
+  const fetchDbReport = async () => {
+    try {
+      const res = await fetch('/api/database-report')
+      const data = await res.json()
+      setDbReport(data)
+    } catch (error) {
+      console.error('Error fetching db report:', error)
+    }
+  }
+
+  // Fetch auto refresh status
+  const fetchRefreshStatus = async () => {
+    try {
+      const res = await fetch('/api/auto-refresh/status')
+      const data = await res.json()
+      setRefreshStatus(data)
+    } catch (error) {
+      console.error('Error fetching refresh status:', error)
     }
   }
 
@@ -119,22 +172,44 @@ export default function Home() {
   useEffect(() => {
     const init = async () => {
       setLoading(true)
-      await fetchDbStats()
-      await fetchStocks()
+      await Promise.all([
+        fetchDbStats(),
+        fetchDbReport(),
+        fetchRefreshStatus()
+      ])
       setLoading(false)
     }
     init()
   }, [])
+
+  // Refresh dashboard data periodically
+  useEffect(() => {
+    if (activeTab !== 'dashboard') return
+    
+    const interval = setInterval(() => {
+      fetchRefreshStatus()
+    }, 5000)
+    
+    return () => clearInterval(interval)
+  }, [activeTab])
 
   // Handle tab change
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
     setPage(0)
     setSelectedMarket('')
+    setLoading(true)
+    
     if (tab === 'database') {
-      fetchStocks()
+      fetchStocks().then(() => setLoading(false))
     } else if (tab === 'news') {
-      fetchNews()
+      fetchNews().then(() => setLoading(false))
+    } else {
+      Promise.all([
+        fetchDbStats(),
+        fetchDbReport(),
+        fetchRefreshStatus()
+      ]).then(() => setLoading(false))
     }
   }
 
@@ -200,8 +275,17 @@ export default function Home() {
     return MARKET_CONFIG[market] || { flag: '🌍', color: 'bg-gray-100 text-gray-700 border-gray-300' }
   }
 
+  const getLogIcon = (type: string) => {
+    switch (type) {
+      case 'success': return <CheckCircle2 className="w-4 h-4 text-green-500" />
+      case 'error': return <XCircle className="w-4 h-4 text-red-500" />
+      case 'warning': return <AlertTriangle className="w-4 h-4 text-yellow-500" />
+      default: return <Activity className="w-4 h-4 text-blue-500" />
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100" dir="rtl">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex flex-col" dir="rtl">
       {/* Header */}
       <header className="bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
@@ -211,7 +295,7 @@ export default function Home() {
                 <Database className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-slate-800">عارض بيانات الأسواق</h1>
+                <h1 className="text-xl font-bold text-slate-800">لوحة تحكم البيانات</h1>
                 <p className="text-sm text-slate-500">السعودية 🇸🇦 | مصر 🇪🇬 | الكويت 🇰🇼 | قطر 🇶🇦</p>
               </div>
             </div>
@@ -219,7 +303,7 @@ export default function Home() {
             {dbStats && (
               <div className="flex items-center gap-3">
                 <Badge variant="outline" className="text-sm">
-                  <Database className="w-3 h-3 ml-1" />
+                  <HardDrive className="w-3 h-3 ml-1" />
                   {dbStats.fileSizeMB} MB
                 </Badge>
                 <Badge variant="secondary" className="text-sm">
@@ -232,9 +316,13 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-4 py-6 flex-1">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
+          <TabsList className="grid w-full grid-cols-3 max-w-lg mx-auto">
+            <TabsTrigger value="dashboard" className="gap-2">
+              <Activity className="w-4 h-4" />
+              لوحة التحكم
+            </TabsTrigger>
             <TabsTrigger value="database" className="gap-2">
               <Table className="w-4 h-4" />
               قاعدة البيانات
@@ -245,13 +333,241 @@ export default function Home() {
             </TabsTrigger>
           </TabsList>
 
+          {/* Dashboard Tab */}
+          <TabsContent value="dashboard" className="space-y-6">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <FileSpreadsheet className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-slate-800">
+                        {dbReport?.totals.tableCount || 0}
+                      </div>
+                      <div className="text-xs text-slate-500">جدول</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <Database className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-slate-800">
+                        {dbReport?.totals.totalRecords.toLocaleString() || 0}
+                      </div>
+                      <div className="text-xs text-slate-500">سجل</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <Building2 className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-slate-800">
+                        {dbReport?.totals.totalSymbols.toLocaleString() || 0}
+                      </div>
+                      <div className="text-xs text-slate-500">رمز فريد</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-100 rounded-lg">
+                      <HardDrive className="w-5 h-5 text-orange-600" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-slate-800">
+                        {dbReport?.fileSize || '0 MB'}
+                      </div>
+                      <div className="text-xs text-slate-500">حجم القاعدة</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Auto Refresh Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <RefreshCw className={`w-5 h-5 ${refreshStatus?.running ? 'text-green-500 animate-spin' : 'text-slate-400'}`} />
+                  حالة التحديث التلقائي
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map(i => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Status Badge */}
+                    <div className="flex items-center gap-3">
+                      <Badge variant={refreshStatus?.running ? 'default' : 'secondary'} className="gap-1">
+                        {refreshStatus?.running ? (
+                          <>
+                            <Zap className="w-3 h-3" />
+                            يعمل
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-3 h-3" />
+                            متوقف
+                          </>
+                        )}
+                      </Badge>
+                      {refreshStatus?.interval && (
+                        <span className="text-sm text-slate-500">
+                          كل {Math.floor(refreshStatus.interval / 60)} دقيقة
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Tasks Status */}
+                    {refreshStatus?.tasks && Object.keys(refreshStatus.tasks).length > 0 && (
+                      <div className="grid md:grid-cols-2 gap-3">
+                        {Object.entries(refreshStatus.tasks).map(([name, task]) => (
+                          <div key={name} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                            <div>
+                              <div className="font-medium text-sm">{name}</div>
+                              <div className="text-xs text-slate-500">
+                                آخر تشغيل: {task.last_run ? formatDate(task.last_run) : 'لم يشتغل'}
+                              </div>
+                            </div>
+                            <div className="text-left">
+                              <Badge variant="outline" className="text-xs">
+                                {task.count} مرة
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Recent Logs */}
+                    {refreshStatus?.logs && refreshStatus.logs.length > 0 && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold mb-2 text-slate-700">آخر السجلات</h4>
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {refreshStatus.logs.slice(-10).reverse().map((log, i) => (
+                            <div key={i} className="flex items-start gap-2 p-2 bg-slate-50 rounded text-sm">
+                              {getLogIcon(log.type)}
+                              <div className="flex-1">
+                                <span className="text-slate-600">{log.message}</span>
+                                <span className="text-xs text-slate-400 mr-2">
+                                  {formatDate(log.time)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Tables Overview */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Database className="w-5 h-5 text-primary" />
+                  نظرة على الجداول
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                      <Skeleton key={i} className="h-20" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {dbReport?.tables.map((table) => (
+                      <div key={table.name} className="bg-slate-50 rounded-lg p-3">
+                        <div className="text-lg font-bold text-slate-800">
+                          {table.count.toLocaleString()}
+                        </div>
+                        <div className="text-xs text-slate-500 truncate">{table.name}</div>
+                        {table.uniqueSymbols > 0 && (
+                          <div className="text-xs text-slate-400 mt-1">
+                            {table.uniqueSymbols} رمز
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Markets Distribution */}
+            {dbReport?.tables.some(t => t.markets && t.markets.length > 0) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">توزيع الأسواق</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {dbReport.tables
+                      .filter(t => t.markets && t.markets.length > 0)
+                      .slice(0, 2)
+                      .map(table => (
+                        <div key={table.name}>
+                          <h4 className="text-sm font-semibold mb-2">{table.name}</h4>
+                          <div className="space-y-2">
+                            {table.markets?.map(market => {
+                              const config = getMarketConfig(market.name)
+                              const percentage = (market.count / table.count) * 100
+                              return (
+                                <div key={market.name} className="space-y-1">
+                                  <div className="flex justify-between text-sm">
+                                    <span className="flex items-center gap-1">
+                                      <span>{config.flag}</span>
+                                      {market.name}
+                                    </span>
+                                    <span className="text-slate-500">{market.count.toLocaleString()}</span>
+                                  </div>
+                                  <Progress value={percentage} className="h-2" />
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
           {/* Database Tab */}
           <TabsContent value="database" className="space-y-4">
             {/* Filter */}
             <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow-sm">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-600">فلترة حسب السوق:</span>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button
                     variant={selectedMarket === '' ? 'default' : 'outline'}
                     size="sm"
@@ -305,10 +621,17 @@ export default function Home() {
                           <td className="px-4 py-3"><Skeleton className="h-4 w-12" /></td>
                         </tr>
                       ))
+                    ) : stocks.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                          لا توجد بيانات
+                        </td>
+                      </tr>
                     ) : (
                       stocks.map((stock, index) => {
                         const marketConfig = getMarketConfig(stock.market)
-                        const changeNum = parseFloat(stock.change_percent?.replace('%', '') || '0')
+                        const changePercentStr = String(stock.change_percent ?? '0').replace('%', '')
+                        const changeNum = parseFloat(changePercentStr)
                         const isPositive = changeNum >= 0
                         
                         return (
@@ -374,7 +697,7 @@ export default function Home() {
                 السابق
               </Button>
               <span className="text-sm text-slate-600">
-                صفحة {page + 1} من {Math.ceil(total / LIMIT)}
+                صفحة {page + 1} من {Math.ceil(total / LIMIT) || 1}
               </span>
               <Button
                 variant="outline"
@@ -394,7 +717,7 @@ export default function Home() {
             <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow-sm">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-600">فلترة حسب السوق:</span>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button
                     variant={selectedMarket === '' ? 'default' : 'outline'}
                     size="sm"
@@ -437,6 +760,12 @@ export default function Home() {
                   </Card>
                 ))}
               </div>
+            ) : news.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center text-slate-500">
+                  لا توجد أخبار
+                </CardContent>
+              </Card>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {news.map((item) => {
@@ -505,7 +834,7 @@ export default function Home() {
                 السابق
               </Button>
               <span className="text-sm text-slate-600">
-                صفحة {page + 1} من {Math.ceil(total / LIMIT)}
+                صفحة {page + 1} من {Math.ceil(total / LIMIT) || 1}
               </span>
               <Button
                 variant="outline"
@@ -519,32 +848,10 @@ export default function Home() {
             </div>
           </TabsContent>
         </Tabs>
-
-        {/* Database Stats Card */}
-        {dbStats && activeTab === 'database' && (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Database className="w-5 h-5 text-primary" />
-                إحصائيات قاعدة البيانات
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {dbStats.tables.map((table) => (
-                  <div key={table.name} className="bg-slate-50 rounded-lg p-3 text-center">
-                    <div className="text-lg font-bold text-slate-800">{table.count.toLocaleString()}</div>
-                    <div className="text-xs text-slate-500 truncate">{table.name}</div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t mt-auto py-4">
+      <footer className="bg-white border-t py-4 mt-auto">
         <div className="container mx-auto px-4 text-center text-sm text-slate-500">
           Data Engine © 2024 - الأسواق العربية: السعودية 🇸🇦 | مصر 🇪🇬 | الكويت 🇰🇼 | قطر 🇶🇦
         </div>
