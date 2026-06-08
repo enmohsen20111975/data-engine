@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { 
   Database, Newspaper, Table, TrendingUp, TrendingDown,
   ChevronLeft, ChevronRight, ExternalLink, Clock, Building2,
   Activity, RefreshCw, HardDrive, FileSpreadsheet, CheckCircle2,
-  XCircle, AlertTriangle, Zap
+  XCircle, AlertTriangle, Zap, X, BarChart3, DollarSign,
+  PieChart, LineChart, FileText, Calculator, Wallet, CandlestickChart
 } from 'lucide-react'
 
 // Types
@@ -25,6 +27,13 @@ interface Stock {
   logo_url?: string
   volume?: number
   market_cap?: number
+}
+
+interface StockDetail {
+  stock: Record<string, unknown>
+  tabs: Record<string, Record<string, unknown>>
+  historical: Record<string, unknown>[]
+  news: Record<string, unknown>[]
 }
 
 interface NewsItem {
@@ -82,6 +91,104 @@ const MARKET_CONFIG: Record<string, { flag: string; color: string }> = {
   'qatar': { flag: '🇶🇦', color: 'bg-purple-100 text-purple-700 border-purple-300' },
 }
 
+// Field labels
+const PERFORMANCE_LABELS: Record<string, string> = {
+  price: 'السعر',
+  change_percent: 'التغير',
+  perf_1w: 'أداء أسبوع',
+  perf_1m: 'أداء شهر',
+  perf_3m: 'أداء 3 شهور',
+  perf_6m: 'أداء 6 شهور',
+  perf_ytd: 'أداء السنة',
+  perf_1y: 'أداء سنة',
+  perf_5y: 'أداء 5 سنين',
+  perf_10y: 'أداء 10 سنين',
+  perf_all: 'أداء الكلي',
+  volatility_1w: 'التذبذب أسبوع',
+  volatility_1m: 'التذبذب شهر',
+}
+
+const VALUATION_LABELS: Record<string, string> = {
+  market_cap: 'القيمة السوقية',
+  market_cap_perf: 'تغير القيمة',
+  pe_ratio: 'مكرر الربحية (P/E)',
+  peg_ratio: 'PEG Ratio',
+  ps_ratio: 'مكرر المبيعات (P/S)',
+  pb_ratio: 'مكرر الدفترية (P/B)',
+  pcf_ratio: 'P/CF',
+  pfcf_ratio: 'P/FCF',
+  ev: 'القيمة المؤسسية',
+  ev_revenue: 'EV/Revenue',
+  ev_ebit: 'EV/EBIT',
+  ev_ebitda: 'EV/EBITDA',
+}
+
+const DIVIDEND_LABELS: Record<string, string> = {
+  dps_ttm: 'توزيعة الـ 12 شهر',
+  dps_fy: 'توزيعة السنة المالية',
+  div_yield: 'عائد التوزيعات',
+  div_yield_fwd: 'العائد المتوقع',
+  payout_ratio: 'نسبة التوزيع',
+  dps_growth: 'نمو التوزيعات',
+  cont_div: 'سنوات التوزيع المستمر',
+  cont_div_growth: 'سنوات النمو المستمر',
+}
+
+const PROFITABILITY_LABELS: Record<string, string> = {
+  gross_margin: 'هامش الربح الإجمالي',
+  operating_margin: 'هامش التشغيل',
+  pretax_margin: 'هامش قبل الضرائب',
+  net_margin: 'هامش الربح الصافي',
+  fcf_margin: 'هامش التدفق النقدي الحر',
+  roa: 'العائد على الأصول (ROA)',
+  roe: 'العائد على حقوق الملكية (ROE)',
+  roc: 'العائد على رأس المال (ROC)',
+}
+
+const INCOME_LABELS: Record<string, string> = {
+  fiscal_period: 'الفترة المالية',
+  fiscal_end: 'نهاية الفترة',
+  revenue: 'الإيرادات',
+  revenue_growth: 'نمو الإيرادات',
+  gross_profit: 'الربح الإجمالي',
+  operating_income: 'دخل التشغيل',
+  net_income: 'صافي الربح',
+  eps_basic: 'ربح السهم الأساسي',
+  eps_diluted: 'ربح السهم المخفف',
+}
+
+const BALANCE_LABELS: Record<string, string> = {
+  total_assets: 'إجمالي الأصول',
+  total_liabilities: 'إجمالي الالتزامات',
+  total_equity: 'حقوق الملكية',
+  shares_outstanding: 'الأسهم القائمة',
+  shares_float: 'الأسهم الحرة',
+  current_assets: 'الأصول المتداولة',
+  current_liabilities: 'الالتزامات المتداولة',
+  cash: 'النقدية',
+  debt: 'الديون',
+}
+
+const CASHFLOW_LABELS: Record<string, string> = {
+  operating_cf: 'التدفق من التشغيل',
+  investing_cf: 'التدفق من الاستثمار',
+  financing_cf: 'التدفق من التمويل',
+  free_cf: 'التدفق النقدي الحر',
+}
+
+const TECHNICAL_LABELS: Record<string, string> = {
+  technical_rating: 'التوصية الفنية',
+  ma_rating: 'توصية المتوسطات',
+  oscillators_rating: 'توصية المذبذبات',
+  trend: 'الاتجاه',
+  momentum: 'الزخم',
+  rsi: 'RSI',
+  macd: 'MACD',
+  stoch: 'Stochastic',
+  adx: 'ADX',
+  atr: 'ATR',
+}
+
 export default function Home() {
   // State
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -96,6 +203,12 @@ export default function Home() {
   const [page, setPage] = useState(0)
   const [total, setTotal] = useState(0)
   const LIMIT = 20
+
+  // Stock detail state
+  const [selectedStock, setSelectedStock] = useState<string | null>(null)
+  const [stockDetail, setStockDetail] = useState<StockDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailTab, setDetailTab] = useState('overview')
 
   // Fetch database stats
   const fetchDbStats = async () => {
@@ -168,6 +281,19 @@ export default function Home() {
     }
   }
 
+  // Fetch stock detail
+  const fetchStockDetail = async (symbol: string) => {
+    setDetailLoading(true)
+    try {
+      const res = await fetch(`/api/stock-detail?symbol=${symbol}`)
+      const data = await res.json()
+      setStockDetail(data)
+    } catch (error) {
+      console.error('Error fetching stock detail:', error)
+    }
+    setDetailLoading(false)
+  }
+
   // Initial load
   useEffect(() => {
     const init = async () => {
@@ -185,13 +311,36 @@ export default function Home() {
   // Refresh dashboard data periodically
   useEffect(() => {
     if (activeTab !== 'dashboard') return
-    
     const interval = setInterval(() => {
       fetchRefreshStatus()
     }, 5000)
-    
     return () => clearInterval(interval)
   }, [activeTab])
+
+  // Load stock detail when selected
+  useEffect(() => {
+    if (!selectedStock) return
+    
+    let isMounted = true
+    const loadDetail = async () => {
+      setDetailLoading(true)
+      try {
+        const res = await fetch(`/api/stock-detail?symbol=${selectedStock}`)
+        const data = await res.json()
+        if (isMounted) {
+          setStockDetail(data)
+        }
+      } catch (error) {
+        console.error('Error fetching stock detail:', error)
+      }
+      if (isMounted) {
+        setDetailLoading(false)
+      }
+    }
+    loadDetail()
+    
+    return () => { isMounted = false }
+  }, [selectedStock])
 
   // Handle tab change
   const handleTabChange = (tab: string) => {
@@ -251,7 +400,7 @@ export default function Home() {
 
   // Format helpers
   const formatPrice = (price: string | number) => {
-    const num = typeof price === 'string' ? parseFloat(price) : price
+    const num = typeof price === 'string' ? parseFloat(price.replace(/[^0-9.-]/g, '')) : price
     if (isNaN(num)) return '-'
     return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
@@ -282,6 +431,39 @@ export default function Home() {
       case 'warning': return <AlertTriangle className="w-4 h-4 text-yellow-500" />
       default: return <Activity className="w-4 h-4 text-blue-500" />
     }
+  }
+
+  // Render data grid
+  const renderDataGrid = (data: Record<string, unknown> | null, labels: Record<string, string>) => {
+    if (!data) return <div className="text-slate-400 text-center py-4">لا توجد بيانات</div>
+    
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {Object.entries(labels).map(([key, label]) => {
+          const value = data[key]
+          if (value === null || value === undefined) return null
+          
+          const strValue = String(value)
+          const isNegative = strValue.startsWith('-') || strValue.startsWith('−')
+          const isPositive = strValue.startsWith('+')
+          
+          return (
+            <div key={key} className="bg-slate-50 rounded-lg p-3">
+              <div className="text-xs text-slate-500 mb-1">{label}</div>
+              <div className={`font-semibold ${isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-slate-800'}`}>
+                {strValue}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  // Get stock name safely
+  const getStockName = () => {
+    if (!stockDetail?.stock) return 'سهم'
+    return (stockDetail.stock.name as string) || (stockDetail.stock.symbol as string) || 'سهم'
   }
 
   return (
@@ -419,7 +601,6 @@ export default function Home() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {/* Status Badge */}
                     <div className="flex items-center gap-3">
                       <Badge variant={refreshStatus?.running ? 'default' : 'secondary'} className="gap-1">
                         {refreshStatus?.running ? (
@@ -441,7 +622,6 @@ export default function Home() {
                       )}
                     </div>
 
-                    {/* Tasks Status */}
                     {refreshStatus?.tasks && Object.keys(refreshStatus.tasks).length > 0 && (
                       <div className="grid md:grid-cols-2 gap-3">
                         {Object.entries(refreshStatus.tasks).map(([name, task]) => (
@@ -462,7 +642,6 @@ export default function Home() {
                       </div>
                     )}
 
-                    {/* Recent Logs */}
                     {refreshStatus?.logs && refreshStatus.logs.length > 0 && (
                       <div className="mt-4">
                         <h4 className="text-sm font-semibold mb-2 text-slate-700">آخر السجلات</h4>
@@ -520,45 +699,6 @@ export default function Home() {
                 )}
               </CardContent>
             </Card>
-
-            {/* Markets Distribution */}
-            {dbReport?.tables.some(t => t.markets && t.markets.length > 0) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">توزيع الأسواق</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {dbReport.tables
-                      .filter(t => t.markets && t.markets.length > 0)
-                      .slice(0, 2)
-                      .map(table => (
-                        <div key={table.name}>
-                          <h4 className="text-sm font-semibold mb-2">{table.name}</h4>
-                          <div className="space-y-2">
-                            {table.markets?.map(market => {
-                              const config = getMarketConfig(market.name)
-                              const percentage = (market.count / table.count) * 100
-                              return (
-                                <div key={market.name} className="space-y-1">
-                                  <div className="flex justify-between text-sm">
-                                    <span className="flex items-center gap-1">
-                                      <span>{config.flag}</span>
-                                      {market.name}
-                                    </span>
-                                    <span className="text-slate-500">{market.count.toLocaleString()}</span>
-                                  </div>
-                                  <Progress value={percentage} className="h-2" />
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
 
           {/* Database Tab */}
@@ -608,6 +748,7 @@ export default function Home() {
                       <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">السوق</th>
                       <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">السعر</th>
                       <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">التغير</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-slate-700">تفاصيل</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -619,11 +760,12 @@ export default function Home() {
                           <td className="px-4 py-3"><Skeleton className="h-4 w-20" /></td>
                           <td className="px-4 py-3"><Skeleton className="h-4 w-16" /></td>
                           <td className="px-4 py-3"><Skeleton className="h-4 w-12" /></td>
+                          <td className="px-4 py-3"><Skeleton className="h-4 w-16" /></td>
                         </tr>
                       ))
                     ) : stocks.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                        <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
                           لا توجد بيانات
                         </td>
                       </tr>
@@ -676,6 +818,16 @@ export default function Home() {
                                 {stock.change_percent}
                               </span>
                             </td>
+                            <td className="px-4 py-3">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedStock(stock.symbol)}
+                                className="text-primary hover:text-primary/80"
+                              >
+                                عرض التفاصيل
+                              </Button>
+                            </td>
                           </tr>
                         )
                       })
@@ -713,7 +865,6 @@ export default function Home() {
 
           {/* News Tab */}
           <TabsContent value="news" className="space-y-4">
-            {/* Filter */}
             <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow-sm">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-600">فلترة حسب السوق:</span>
@@ -747,7 +898,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* News Grid */}
             {loading ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -774,7 +924,6 @@ export default function Home() {
                   return (
                     <Card key={item.id} className="group hover:shadow-lg transition-all duration-200 overflow-hidden">
                       <CardContent className="p-0">
-                        {/* Header with market badge */}
                         <div className={`px-4 py-2 ${marketConfig.color} border-b`}>
                           <div className="flex items-center justify-between">
                             <Badge variant="outline" className="bg-white/50 text-xs">
@@ -785,7 +934,6 @@ export default function Home() {
                           </div>
                         </div>
                         
-                        {/* Content */}
                         <div className="p-4">
                           <h3 className="font-semibold text-slate-800 mb-2 line-clamp-2 group-hover:text-primary transition-colors">
                             {item.title}
@@ -797,7 +945,6 @@ export default function Home() {
                             </p>
                           )}
                           
-                          {/* Footer */}
                           <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                             <div className="flex items-center gap-1 text-xs text-slate-500">
                               <Clock className="w-3 h-3" />
@@ -822,7 +969,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Pagination */}
             <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow-sm">
               <Button
                 variant="outline"
@@ -849,6 +995,317 @@ export default function Home() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Stock Detail Modal */}
+      {selectedStock && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-6xl max-h-[90vh] overflow-hidden">
+            <CardHeader className="bg-slate-50 border-b">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {stockDetail?.stock?.logo_url ? (
+                    <img 
+                      src={stockDetail.stock.logo_url as string} 
+                      alt={selectedStock}
+                      className="w-10 h-10 rounded"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center">
+                      <span className="font-bold text-primary">{selectedStock?.charAt(0)}</span>
+                    </div>
+                  )}
+                  <div>
+                    <CardTitle className="text-lg">{getStockName()}</CardTitle>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline">{selectedStock}</Badge>
+                      {stockDetail?.stock?.market && (
+                        <Badge variant="secondary" className="gap-1">
+                          <span>{getMarketConfig(stockDetail.stock.market as string).flag}</span>
+                          {stockDetail.stock.market as string}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setSelectedStock(null)
+                    setStockDetail(null)
+                    setDetailTab('overview')
+                  }}
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+            </CardHeader>
+            
+            <CardContent className="p-0">
+              <ScrollArea className="h-[calc(90vh-120px)]">
+                {detailLoading ? (
+                  <div className="p-6 space-y-4">
+                    {[1, 2, 3, 4].map(i => (
+                      <Skeleton key={i} className="h-20 w-full" />
+                    ))}
+                  </div>
+                ) : stockDetail ? (
+                  <div className="p-6">
+                    <Tabs value={detailTab} onValueChange={setDetailTab}>
+                      <TabsList className="mb-4 flex-wrap h-auto gap-1">
+                        <TabsTrigger value="overview" className="gap-1">
+                          <PieChart className="w-4 h-4" />
+                          نظرة عامة
+                        </TabsTrigger>
+                        <TabsTrigger value="performance" className="gap-1">
+                          <BarChart3 className="w-4 h-4" />
+                          الأداء
+                        </TabsTrigger>
+                        <TabsTrigger value="valuation" className="gap-1">
+                          <DollarSign className="w-4 h-4" />
+                          التقييم
+                        </TabsTrigger>
+                        <TabsTrigger value="dividends" className="gap-1">
+                          <Wallet className="w-4 h-4" />
+                          التوزيعات
+                        </TabsTrigger>
+                        <TabsTrigger value="profitability" className="gap-1">
+                          <Calculator className="w-4 h-4" />
+                          الربحية
+                        </TabsTrigger>
+                        <TabsTrigger value="financials" className="gap-1">
+                          <FileText className="w-4 h-4" />
+                          القوائم المالية
+                        </TabsTrigger>
+                        <TabsTrigger value="technical" className="gap-1">
+                          <CandlestickChart className="w-4 h-4" />
+                          الفني
+                        </TabsTrigger>
+                        <TabsTrigger value="historical" className="gap-1">
+                          <LineChart className="w-4 h-4" />
+                          التاريخي
+                        </TabsTrigger>
+                      </TabsList>
+
+                      {/* Overview Tab */}
+                      <TabsContent value="overview" className="space-y-4">
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm">معلومات أساسية</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-slate-50 rounded-lg p-3">
+                                  <div className="text-xs text-slate-500">السعر</div>
+                                  <div className="font-semibold">{String(stockDetail.stock.price || '-')}</div>
+                                </div>
+                                <div className="bg-slate-50 rounded-lg p-3">
+                                  <div className="text-xs text-slate-500">التغير</div>
+                                  <div className="font-semibold">{String(stockDetail.stock.change_percent || '-')}</div>
+                                </div>
+                                <div className="bg-slate-50 rounded-lg p-3">
+                                  <div className="text-xs text-slate-500">السوق</div>
+                                  <div className="font-semibold">{String(stockDetail.stock.market || '-')}</div>
+                                </div>
+                                <div className="bg-slate-50 rounded-lg p-3">
+                                  <div className="text-xs text-slate-500">الرمز</div>
+                                  <div className="font-semibold">{String(stockDetail.stock.symbol || '-')}</div>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm">التقييم السريع</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              {stockDetail.tabs.tab_valuation ? (
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="bg-slate-50 rounded-lg p-3">
+                                    <div className="text-xs text-slate-500">القيمة السوقية</div>
+                                    <div className="font-semibold">{String(stockDetail.tabs.tab_valuation.market_cap || '-')}</div>
+                                  </div>
+                                  <div className="bg-slate-50 rounded-lg p-3">
+                                    <div className="text-xs text-slate-500">مكرر الربحية</div>
+                                    <div className="font-semibold">{String(stockDetail.tabs.tab_valuation.pe_ratio || '-')}</div>
+                                  </div>
+                                  <div className="bg-slate-50 rounded-lg p-3">
+                                    <div className="text-xs text-slate-500">عائد التوزيعات</div>
+                                    <div className="font-semibold">{String(stockDetail.tabs.tab_dividends?.div_yield || '-')}</div>
+                                  </div>
+                                  <div className="bg-slate-50 rounded-lg p-3">
+                                    <div className="text-xs text-slate-500">التوصية الفنية</div>
+                                    <div className="font-semibold">{String(stockDetail.tabs.tab_technical_analysis?.technical_rating || '-')}</div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-slate-400 text-center py-4">لا توجد بيانات تقييم</div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </TabsContent>
+
+                      {/* Performance Tab */}
+                      <TabsContent value="performance">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-sm flex items-center gap-2">
+                              <BarChart3 className="w-4 h-4" />
+                              بيانات الأداء
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {renderDataGrid(stockDetail.tabs.tab_performance as Record<string, unknown>, PERFORMANCE_LABELS)}
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+
+                      {/* Valuation Tab */}
+                      <TabsContent value="valuation">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-sm flex items-center gap-2">
+                              <DollarSign className="w-4 h-4" />
+                              بيانات التقييم
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {renderDataGrid(stockDetail.tabs.tab_valuation as Record<string, unknown>, VALUATION_LABELS)}
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+
+                      {/* Dividends Tab */}
+                      <TabsContent value="dividends">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-sm flex items-center gap-2">
+                              <Wallet className="w-4 h-4" />
+                              بيانات التوزيعات
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {renderDataGrid(stockDetail.tabs.tab_dividends as Record<string, unknown>, DIVIDEND_LABELS)}
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+
+                      {/* Profitability Tab */}
+                      <TabsContent value="profitability">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-sm flex items-center gap-2">
+                              <Calculator className="w-4 h-4" />
+                              بيانات الربحية
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {renderDataGrid(stockDetail.tabs.tab_profitability as Record<string, unknown>, PROFITABILITY_LABELS)}
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+
+                      {/* Financials Tab */}
+                      <TabsContent value="financials" className="space-y-4">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-sm">قائمة الدخل</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {renderDataGrid(stockDetail.tabs.tab_income_statement as Record<string, unknown>, INCOME_LABELS)}
+                          </CardContent>
+                        </Card>
+                        
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-sm">الميزانية العمومية</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {renderDataGrid(stockDetail.tabs.tab_balance_sheet as Record<string, unknown>, BALANCE_LABELS)}
+                          </CardContent>
+                        </Card>
+                        
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-sm">قائمة التدفقات النقدية</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {renderDataGrid(stockDetail.tabs.tab_cash_flow as Record<string, unknown>, CASHFLOW_LABELS)}
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+
+                      {/* Technical Tab */}
+                      <TabsContent value="technical">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-sm flex items-center gap-2">
+                              <CandlestickChart className="w-4 h-4" />
+                              التحليل الفني
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {renderDataGrid(stockDetail.tabs.tab_technical_analysis as Record<string, unknown>, TECHNICAL_LABELS)}
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+
+                      {/* Historical Tab */}
+                      <TabsContent value="historical">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-sm flex items-center gap-2">
+                              <LineChart className="w-4 h-4" />
+                              البيانات التاريخية (آخر 30 يوم)
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {stockDetail.historical && stockDetail.historical.length > 0 ? (
+                              <div className="overflow-x-auto">
+                                <table className="w-full">
+                                  <thead className="bg-slate-100">
+                                    <tr>
+                                      <th className="px-3 py-2 text-right text-xs font-semibold">التاريخ</th>
+                                      <th className="px-3 py-2 text-right text-xs font-semibold">الافتتاح</th>
+                                      <th className="px-3 py-2 text-right text-xs font-semibold">الأعلى</th>
+                                      <th className="px-3 py-2 text-right text-xs font-semibold">الأدنى</th>
+                                      <th className="px-3 py-2 text-right text-xs font-semibold">الإغلاق</th>
+                                      <th className="px-3 py-2 text-right text-xs font-semibold">الحجم</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {stockDetail.historical.map((row, i) => (
+                                      <tr key={i} className="hover:bg-slate-50">
+                                        <td className="px-3 py-2 text-sm">{String(row.date || '-')}</td>
+                                        <td className="px-3 py-2 text-sm">{String(row.open || '-')}</td>
+                                        <td className="px-3 py-2 text-sm text-green-600">{String(row.high || '-')}</td>
+                                        <td className="px-3 py-2 text-sm text-red-600">{String(row.low || '-')}</td>
+                                        <td className="px-3 py-2 text-sm font-medium">{String(row.close || '-')}</td>
+                                        <td className="px-3 py-2 text-sm">{String(row.volume || '-')}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="text-slate-400 text-center py-4">لا توجد بيانات تاريخية</div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+                ) : (
+                  <div className="p-6 text-center text-slate-500">لا توجد بيانات</div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="bg-white border-t py-4 mt-auto">
