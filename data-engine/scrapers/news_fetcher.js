@@ -56,6 +56,14 @@ const MARKETS = {
 let zai = null;
 let db = null;
 
+// Cache for news (1 hour)
+const newsCache = new Map();
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
+// Rate limiting
+const requestTimes = [];
+const MAX_REQUESTS_PER_MINUTE = 30;
+
 async function initialize() {
     // Initialize Z-AI
     zai = await ZAI.create();
@@ -91,13 +99,66 @@ function createNewsTable() {
     console.log('✓ News table ready');
 }
 
+async function checkRateLimit() {
+    const now = Date.now();
+    const oneMinuteAgo = now - 60000;
+    
+    // Remove old requests
+    while (requestTimes.length > 0 && requestTimes[0] < oneMinuteAgo) {
+        requestTimes.shift();
+    }
+    
+    if (requestTimes.length >= MAX_REQUESTS_PER_MINUTE) {
+        const waitTime = 60000 - (now - requestTimes[0]);
+        console.log(`Rate limit reached. Waiting ${Math.ceil(waitTime/1000)}s...`);
+        await new Promise(r => setTimeout(r, waitTime));
+        return checkRateLimit();
+    }
+    
+    requestTimes.push(now);
+}
+
 async function searchNews(query, numResults = 10, recencyDays = 7) {
     try {
-        const results = await zai.functions.invoke('web_search', {
-            query: query,
-            num: numResults,
-            recency_days: recencyDays
-        });
+        // Check cache first
+        const cacheKey = `${query}_${numResults}_${recencyDays}`;
+        const cached = newsCache.get(cacheKey);
+        
+        if (cached && (Date.now() - cached.time) < CACHE_DURATION) {
+            console.log(`  (Using cached results for: ${query})`);
+            return cached.data;
+        }
+        
+        // Rate limit check
+        await checkRateLimit();
+        
+        // Retry logic
+        let retries = 3;
+        let results = null;
+        
+        while (retries > 0 && !results) {
+            try {
+                results = await zai.functions.invoke('web_search', {
+                    query: query,
+                    num: numResults,
+                    recency_days: recencyDays
+                });
+            } catch (e) {
+                retries--;
+                if (retries > 0) {
+                    console.log(`  Retry ${3-retries}/3...`);
+                    await new Promise(r => setTimeout(r, 1000));
+                }
+            }
+        }
+        
+        // Cache the results
+        if (results && results.length > 0) {
+            newsCache.set(cacheKey, {
+                data: results,
+                time: Date.now()
+            });
+        }
         
         return results || [];
     } catch (error) {
