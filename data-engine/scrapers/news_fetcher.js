@@ -26,42 +26,85 @@ const CONFIG_PATH = path.join(__dirname, '..', 'config', 'api_keys.json');
 // Load API keys
 const API_KEYS = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
 
-// Markets configuration - Arabic & English queries
+// Markets configuration - Filtered for Arab region economy & crypto
 const MARKETS = {
     saudi: {
         name: 'السعودية',
         exchange: 'Tadawul',
         queries: [
-            'Saudi stock market TASI news',
-            'Tadawul Saudi Arabia financial',
-            'Aramco Saudi dividend'
+            'Saudi Aramco earnings profit dividend',
+            'Tadawul stock market Saudi companies',
+            'Saudi Arabia GDP economy growth',
+            'Saudi Vision 2030 investment projects'
         ]
     },
     egypt: {
         name: 'مصر',
         exchange: 'EGX',
         queries: [
-            'Egypt stock market EGX news',
-            'Egyptian Exchange Cairo financial'
+            'Egypt EGX stock market',
+            'Egypt economy IMF investment',
+            'Egyptian companies profit earnings'
         ]
     },
     kuwait: {
         name: 'الكويت',
         exchange: 'KSE',
         queries: [
-            'Kuwait stock exchange Boursa news',
-            'Kuwait financial market'
+            'Kuwait Boursa stock market',
+            'Kuwait oil companies profit',
+            'Kuwait investment economy'
         ]
     },
     qatar: {
         name: 'قطر',
         exchange: 'QSE',
         queries: [
-            'Qatar stock exchange QSE news',
-            'Qatar financial market Doha'
+            'Qatar stock exchange companies',
+            'Qatar Energy earnings profit',
+            'Qatar economy investment'
+        ]
+    },
+    crypto: {
+        name: 'العملات الرقمية',
+        exchange: 'Crypto',
+        queries: [
+            'Bitcoin price market trading',
+            'Ethereum cryptocurrency news',
+            'Crypto market regulation SEC'
         ]
     }
 };
+
+// Required keywords for filtering (economy/business related)
+const REQUIRED_KEYWORDS = [
+    // Financial terms
+    'profit', 'earnings', 'dividend', 'revenue', 'stock', 'market', 'investment',
+    'IPO', 'share', 'bond', 'portfolio', 'trading', 'GDP', 'economy', 'growth',
+    // Business terms
+    'company', 'companies', 'corporate', 'business', 'enterprise', 'startup',
+    'merger', 'acquisition', 'deal', 'contract', 'expansion',
+    // Oil & Energy
+    'oil', 'gas', 'petrol', 'energy', 'Aramco', 'SABIC', 'OPEC',
+    // Banking & Finance
+    'bank', 'loan', 'credit', 'interest', 'inflation', 'currency', 'exchange',
+    // Crypto terms
+    'bitcoin', 'crypto', 'blockchain', 'ethereum', 'NFT', 'defi', 'token',
+    // Real Estate
+    'real estate', 'property', 'housing', 'construction',
+    // Tech terms
+    'AI', 'technology', 'digital', 'software', 'app',
+    // Region specific
+    'Saudi', 'Kuwait', 'Qatar', 'Egypt', 'UAE', 'Dubai', 'GCC', 'Gulf',
+    'Tadawul', 'EGX', 'Boursa'
+];
+
+// Blocked keywords (non-economic news)
+const BLOCKED_KEYWORDS = [
+    'celebrity', 'gossip', 'entertainment', 'movie', 'music', 'sport',
+    'fashion', 'lifestyle', 'recipe', 'food', 'travel guide', 'vacation',
+    'game', 'gaming', 'horoscope', 'astrology', 'CIA', 'conspiracy'
+];
 
 // API Providers
 const PROVIDERS = [
@@ -266,6 +309,31 @@ async function searchNewsWithFallback(query) {
 }
 
 // ============================================
+// Filter News by Keywords
+// ============================================
+function filterNewsByKeywords(articles) {
+    return articles.filter(article => {
+        const text = `${article.title} ${article.snippet || ''}`.toLowerCase();
+        
+        // Check for blocked keywords first
+        for (const blocked of BLOCKED_KEYWORDS) {
+            if (text.toLowerCase().includes(blocked.toLowerCase())) {
+                return false;
+            }
+        }
+        
+        // Check for required keywords
+        for (const keyword of REQUIRED_KEYWORDS) {
+            if (text.toLowerCase().includes(keyword.toLowerCase())) {
+                return true;
+            }
+        }
+        
+        return false;
+    });
+}
+
+// ============================================
 // Database Functions
 // ============================================
 function initialize() {
@@ -359,11 +427,18 @@ async function fetchAllNews() {
             const { provider, results } = await searchNewsWithFallback(query);
             
             if (results.length > 0) {
-                const saved = await saveNewsToDb(results, marketKey, query, provider);
-                totalSaved += saved;
-                stats[marketKey].total += saved;
-                stats[marketKey].byProvider[provider] = (stats[marketKey].byProvider[provider] || 0) + saved;
-                console.log(`    💾 Saved ${saved} articles`);
+                // Filter by keywords before saving
+                const filteredResults = filterNewsByKeywords(results);
+                
+                if (filteredResults.length > 0) {
+                    const saved = await saveNewsToDb(filteredResults, marketKey, query, provider);
+                    totalSaved += saved;
+                    stats[marketKey].total += saved;
+                    stats[marketKey].byProvider[provider] = (stats[marketKey].byProvider[provider] || 0) + saved;
+                    console.log(`    💾 Saved ${saved} articles (filtered from ${results.length})`);
+                } else {
+                    console.log(`    ⚠️ All ${results.length} articles filtered out`);
+                }
             } else {
                 console.log(`    ❌ No results`);
             }
