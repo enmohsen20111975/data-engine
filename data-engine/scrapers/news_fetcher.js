@@ -14,42 +14,48 @@ const path = require('path');
 // Database path
 const DB_PATH = path.join(__dirname, '..', 'data', 'data_engine.db');
 
-// Markets configuration
+// Markets configuration - Arabic queries for Arabic news
 const MARKETS = {
     saudi: {
         name: 'السعودية',
         exchange: 'Tadawul',
         queries: [
-            'Tadawul Saudi stock market TASI news',
-            'Saudi Arabia stock exchange companies IPO',
-            'Argaam Saudi financial news Tadawul'
+            'site:argaam.com أخبار تداول أسهم السعودية',
+            'site:mubasher.info السعودية أخبار الأسهم',
+            'أخبار مالية السعودية ارتفاع انخفاض أسهم',
+            'نتائج أعمال الشركات السعودية ربع سنوي',
+            'توزيعات أرباح الشركات السعودية 2024'
         ]
     },
     egypt: {
         name: 'مصر',
         exchange: 'EGX',
         queries: [
-            'EGX Egypt stock market news today',
-            'Egyptian exchange EGX30 companies trading',
-            'Egypt stock market financial news'
+            'site:mubasher.info مصر أخبار البورصة',
+            'أخبار البورصة المصرية ارتفاع انخفاض',
+            'نتائج أعمال الشركات المصرية',
+            'توصيات أسهم مصرية تحليل فني',
+            'توزيعات أرباح الشركات المصرية'
         ]
     },
     kuwait: {
         name: 'الكويت',
         exchange: 'KSE',
         queries: [
-            'Kuwait stock exchange KSE market news',
-            'Boursa Kuwait trading companies stocks',
-            'Kuwait financial market news today'
+            'site:mubasher.info الكويت أخبار بورصة',
+            'أخبار بورصة الكويت ارتفاع انخفاض',
+            'نتائج أعمال الشركات الكويتية',
+            'توزيعات أرباح الشركات الكويتية'
         ]
     },
     qatar: {
         name: 'قطر',
         exchange: 'QSE',
         queries: [
-            'Qatar Stock Exchange QSE market news',
-            'Qatar financial market QE index stocks',
-            'Doha stock exchange trading news'
+            'site:mubasher.info قطر أخبار بورصة',
+            'أخبار بورصة قطر ارتفاع انخفاض',
+            'نتائج أعمال الشركات القطرية',
+            'توزيعات أرباح الشركات القطرية'
         ]
     }
 };
