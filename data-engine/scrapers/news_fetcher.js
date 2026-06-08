@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * News Fetcher for Stock Markets
  * جالب الأخبار للأسواق المالية
