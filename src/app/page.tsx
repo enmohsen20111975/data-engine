@@ -8,12 +8,14 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { 
   Database, Newspaper, Table, TrendingUp, TrendingDown,
   ChevronLeft, ChevronRight, ExternalLink, Clock, Building2,
   Activity, RefreshCw, HardDrive, FileSpreadsheet, CheckCircle2,
   XCircle, AlertTriangle, Zap, X, BarChart3, DollarSign,
-  PieChart, LineChart, FileText, Calculator, Wallet, CandlestickChart
+  PieChart, LineChart, FileText, Calculator, Wallet, CandlestickChart,
+  Target, Shield, AlertCircle, Sparkles, Gauge, Users
 } from 'lucide-react'
 
 // Types
@@ -79,6 +81,36 @@ interface AutoRefreshStatus {
   logs: { time: string; message: string; type: string }[]
 }
 
+interface AnalysisRecommendation {
+  symbol: string
+  name: string
+  market: string
+  action: 'BUY' | 'SELL' | 'HOLD'
+  master_score: number
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW'
+  entry_price: number
+  stop_loss: number
+  take_profit_1: number
+  take_profit_2: number
+  take_profit_3: number
+  position_size_percent: number
+  technical_score: number
+  fundamental_score: number
+  signals: string[]
+  warnings: string[]
+  reason: string
+  market_regime: string
+  personality_match: boolean
+  timestamp: string
+}
+
+interface MarketAnalysisResult {
+  market: string
+  personality: string
+  total_recommendations: number
+  recommendations: AnalysisRecommendation[]
+}
+
 // Market flags and colors
 const MARKET_CONFIG: Record<string, { flag: string; color: string }> = {
   'السعودية': { flag: '🇸🇦', color: 'bg-green-100 text-green-700 border-green-300' },
@@ -90,6 +122,17 @@ const MARKET_CONFIG: Record<string, { flag: string; color: string }> = {
   'kuwait': { flag: '🇰🇼', color: 'bg-blue-100 text-blue-700 border-blue-300' },
   'qatar': { flag: '🇶🇦', color: 'bg-purple-100 text-purple-700 border-purple-300' },
 }
+
+// Personality types
+const PERSONALITY_TYPES = [
+  { value: 'conservative', label: 'محافظ', description: 'عتبة شراء 85%', icon: Shield },
+  { value: 'moderate', label: 'معتدل', description: 'عتبة شراء 80%', icon: Shield },
+  { value: 'balanced', label: 'متوازن', description: 'عتبة شراء 75%', icon: Gauge },
+  { value: 'growth', label: 'نمو', description: 'عتبة شراء 70%', icon: TrendingUp },
+  { value: 'aggressive', label: 'عدواني', description: 'عتبة شراء 65%', icon: Zap },
+  { value: 'speculative', label: 'مضارب', description: 'عتبة شراء 60%', icon: AlertCircle },
+  { value: 'gambler', label: 'مقامر', description: 'عتبة شراء 55%', icon: AlertTriangle },
+]
 
 // Field labels
 const PERFORMANCE_LABELS: Record<string, string> = {
@@ -210,6 +253,14 @@ export default function Home() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailTab, setDetailTab] = useState('overview')
 
+  // Analysis state
+  const [analysisMarket, setAnalysisMarket] = useState<string>('all')
+  const [analysisPersonality, setAnalysisPersonality] = useState<string>('balanced')
+  const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [analysisResult, setAnalysisResult] = useState<MarketAnalysisResult | null>(null)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
+  const [selectedRecommendation, setSelectedRecommendation] = useState<AnalysisRecommendation | null>(null)
+
   // Fetch database stats
   const fetchDbStats = async () => {
     try {
@@ -294,6 +345,35 @@ export default function Home() {
     setDetailLoading(false)
   }
 
+  // Run market analysis
+  const runAnalysis = async () => {
+    setAnalysisLoading(true)
+    setAnalysisError(null)
+    setAnalysisResult(null)
+    
+    try {
+      const params = new URLSearchParams({
+        action: 'market',
+        personality: analysisPersonality,
+        limit: '20'
+      })
+      if (analysisMarket && analysisMarket !== 'all') params.set('market', analysisMarket)
+      
+      const res = await fetch(`/api/analyze?${params}`)
+      const data = await res.json()
+      
+      if (data.error) {
+        setAnalysisError(data.error)
+      } else {
+        setAnalysisResult(data)
+      }
+    } catch (error) {
+      setAnalysisError(String(error))
+    }
+    
+    setAnalysisLoading(false)
+  }
+
   // Initial load
   useEffect(() => {
     const init = async () => {
@@ -353,6 +433,8 @@ export default function Home() {
       fetchStocks().then(() => setLoading(false))
     } else if (tab === 'news') {
       fetchNews().then(() => setLoading(false))
+    } else if (tab === 'analysis') {
+      setLoading(false)
     } else {
       Promise.all([
         fetchDbStats(),
@@ -433,6 +515,33 @@ export default function Home() {
     }
   }
 
+  const getActionColor = (action: string) => {
+    switch (action) {
+      case 'BUY': return 'text-green-600 bg-green-50 border-green-200'
+      case 'SELL': return 'text-red-600 bg-red-50 border-red-200'
+      default: return 'text-yellow-600 bg-yellow-50 border-yellow-200'
+    }
+  }
+
+  const getConfidenceColor = (confidence: string) => {
+    switch (confidence) {
+      case 'HIGH': return 'bg-green-500'
+      case 'MEDIUM': return 'bg-yellow-500'
+      default: return 'bg-orange-500'
+    }
+  }
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-green-600'
+    if (score >= 65) return 'text-yellow-600'
+    if (score >= 50) return 'text-orange-600'
+    return 'text-red-600'
+  }
+
+  const getPersonalityInfo = (value: string) => {
+    return PERSONALITY_TYPES.find(p => p.value === value) || PERSONALITY_TYPES[2]
+  }
+
   // Render data grid
   const renderDataGrid = (data: Record<string, unknown> | null, labels: Record<string, string>) => {
     if (!data) return <div className="text-slate-400 text-center py-4">لا توجد بيانات</div>
@@ -500,7 +609,7 @@ export default function Home() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 flex-1">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-lg mx-auto">
+          <TabsList className="grid w-full grid-cols-4 max-w-2xl mx-auto">
             <TabsTrigger value="dashboard" className="gap-2">
               <Activity className="w-4 h-4" />
               لوحة التحكم
@@ -512,6 +621,10 @@ export default function Home() {
             <TabsTrigger value="news" className="gap-2">
               <Newspaper className="w-4 h-4" />
               الأخبار
+            </TabsTrigger>
+            <TabsTrigger value="analysis" className="gap-2">
+              <BarChart3 className="w-4 h-4" />
+              التحليلات
             </TabsTrigger>
           </TabsList>
 
@@ -993,6 +1106,242 @@ export default function Home() {
               </Button>
             </div>
           </TabsContent>
+
+          {/* Analysis Tab */}
+          <TabsContent value="analysis" className="space-y-6">
+            {/* Analysis Controls */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  محرك التحليل الذكي
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-3 gap-4">
+                  {/* Market Selection */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">السوق</label>
+                    <Select value={analysisMarket} onValueChange={setAnalysisMarket}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر السوق" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">كل الأسواق</SelectItem>
+                        <SelectItem value="السعودية">🇸🇦 السعودية</SelectItem>
+                        <SelectItem value="مصر">🇪🇬 مصر</SelectItem>
+                        <SelectItem value="الكويت">🇰🇼 الكويت</SelectItem>
+                        <SelectItem value="قطر">🇶🇦 قطر</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Personality Selection */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">شخصية المستثمر</label>
+                    <Select value={analysisPersonality} onValueChange={setAnalysisPersonality}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر الشخصية" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PERSONALITY_TYPES.map(p => {
+                          const Icon = p.icon
+                          return (
+                            <SelectItem key={p.value} value={p.value}>
+                              <div className="flex items-center gap-2">
+                                <Icon className="w-4 h-4" />
+                                <span>{p.label}</span>
+                                <span className="text-xs text-slate-400">({p.description})</span>
+                              </div>
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Run Button */}
+                  <div className="flex items-end">
+                    <Button 
+                      onClick={runAnalysis} 
+                      disabled={analysisLoading}
+                      className="w-full gap-2"
+                      size="lg"
+                    >
+                      {analysisLoading ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          جاري التحليل...
+                        </>
+                      ) : (
+                        <>
+                          <BarChart3 className="w-4 h-4" />
+                          تشغيل التحليل
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Personality Info */}
+                <div className="mt-4 p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Users className="w-4 h-4 text-slate-500" />
+                    <span className="font-medium text-slate-700">
+                      {getPersonalityInfo(analysisPersonality).label}:
+                    </span>
+                    <span className="text-slate-600">
+                      {getPersonalityInfo(analysisPersonality).description}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Error Display */}
+            {analysisError && (
+              <Card className="border-red-200 bg-red-50">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-red-700">
+                    <AlertCircle className="w-5 h-5" />
+                    <span className="font-medium">خطأ في التحليل:</span>
+                    <span>{analysisError}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Analysis Results */}
+            {analysisResult && (
+              <div className="space-y-4">
+                {/* Summary */}
+                <Card className="bg-gradient-to-r from-primary/5 to-primary/10">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/20 rounded-lg">
+                          <Target className="w-6 h-6 text-primary" />
+                        </div>
+                        <div>
+                          <div className="text-2xl font-bold text-slate-800">
+                            {analysisResult.total_recommendations}
+                          </div>
+                          <div className="text-sm text-slate-600">توصية شراء</div>
+                        </div>
+                      </div>
+                      <div className="text-left">
+                        <Badge variant="outline" className="mb-1">
+                          {analysisResult.market === 'All' ? 'كل الأسواق' : analysisResult.market}
+                        </Badge>
+                        <div className="text-xs text-slate-500">
+                          الشخصية: {getPersonalityInfo(analysisResult.personality).label}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Recommendations Grid */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  {analysisResult.recommendations.map((rec, index) => (
+                    <Card 
+                      key={rec.symbol} 
+                      className="cursor-pointer hover:shadow-lg transition-all"
+                      onClick={() => setSelectedRecommendation(rec)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center font-bold text-primary">
+                              {index + 1}
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-800">{rec.symbol}</div>
+                              <div className="text-xs text-slate-500 truncate max-w-32">{rec.name}</div>
+                            </div>
+                          </div>
+                          <Badge className={`${getActionColor(rec.action)} border`}>
+                            {rec.action === 'BUY' ? 'شراء' : rec.action === 'SELL' ? 'بيع' : 'انتظار'}
+                          </Badge>
+                        </div>
+
+                        {/* Score */}
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm text-slate-600">درجة التحليل</span>
+                            <span className={`text-lg font-bold ${getScoreColor(rec.master_score)}`}>
+                              {rec.master_score.toFixed(0)}%
+                            </span>
+                          </div>
+                          <Progress value={rec.master_score} className="h-2" />
+                        </div>
+
+                        {/* Scores Grid */}
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                          <div className="bg-slate-50 rounded p-2 text-center">
+                            <div className="text-xs text-slate-500">الفني</div>
+                            <div className="font-semibold text-slate-800">{rec.technical_score.toFixed(0)}%</div>
+                          </div>
+                          <div className="bg-slate-50 rounded p-2 text-center">
+                            <div className="text-xs text-slate-500">الأساسي</div>
+                            <div className="font-semibold text-slate-800">{rec.fundamental_score.toFixed(0)}%</div>
+                          </div>
+                        </div>
+
+                        {/* Price Levels */}
+                        <div className="flex items-center justify-between text-xs">
+                          <div>
+                            <span className="text-slate-500">دخول: </span>
+                            <span className="font-medium text-slate-800">{formatPrice(rec.entry_price)}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">وقف: </span>
+                            <span className="font-medium text-red-600">{formatPrice(rec.stop_loss)}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">هدف: </span>
+                            <span className="font-medium text-green-600">{formatPrice(rec.take_profit_1)}</span>
+                          </div>
+                        </div>
+
+                        {/* Confidence */}
+                        <div className="mt-3 flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <div className={`w-2 h-2 rounded-full ${getConfidenceColor(rec.confidence)}`}></div>
+                            <span className="text-xs text-slate-600">
+                              {rec.confidence === 'HIGH' ? 'ثقة عالية' : rec.confidence === 'MEDIUM' ? 'ثقة متوسطة' : 'ثقة منخفضة'}
+                            </span>
+                          </div>
+                          <span className="text-xs text-slate-500">
+                            حجم المركز: {rec.position_size_percent.toFixed(1)}%
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {!analysisResult && !analysisLoading && !analysisError && (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <BarChart3 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-700 mb-2">محرك التحليل الذكي</h3>
+                  <p className="text-slate-500 mb-4">
+                    اختر السوق وشخصية المستثمر ثم اضغط على &quot;تشغيل التحليل&quot;
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Badge variant="outline">تحليل فني 30%</Badge>
+                    <Badge variant="outline">تحليل أساسي 25%</Badge>
+                    <Badge variant="outline">تحليل كمي 15%</Badge>
+                    <Badge variant="outline">تحليل معنوي 30%</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -1033,275 +1382,243 @@ export default function Home() {
                   onClick={() => {
                     setSelectedStock(null)
                     setStockDetail(null)
-                    setDetailTab('overview')
                   }}
                 >
                   <X className="w-5 h-5" />
                 </Button>
               </div>
             </CardHeader>
-            
             <CardContent className="p-0">
-              <ScrollArea className="h-[calc(90vh-120px)]">
-                {detailLoading ? (
-                  <div className="p-6 space-y-4">
-                    {[1, 2, 3, 4].map(i => (
-                      <Skeleton key={i} className="h-20 w-full" />
-                    ))}
-                  </div>
-                ) : stockDetail ? (
-                  <div className="p-6">
+              {detailLoading ? (
+                <div className="p-8 space-y-4">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              ) : (
+                <ScrollArea className="h-[70vh]">
+                  <div className="p-4">
+                    {/* Detail Tabs */}
                     <Tabs value={detailTab} onValueChange={setDetailTab}>
-                      <TabsList className="mb-4 flex-wrap h-auto gap-1">
-                        <TabsTrigger value="overview" className="gap-1">
-                          <PieChart className="w-4 h-4" />
-                          نظرة عامة
-                        </TabsTrigger>
-                        <TabsTrigger value="performance" className="gap-1">
-                          <BarChart3 className="w-4 h-4" />
-                          الأداء
-                        </TabsTrigger>
-                        <TabsTrigger value="valuation" className="gap-1">
-                          <DollarSign className="w-4 h-4" />
-                          التقييم
-                        </TabsTrigger>
-                        <TabsTrigger value="dividends" className="gap-1">
-                          <Wallet className="w-4 h-4" />
-                          التوزيعات
-                        </TabsTrigger>
-                        <TabsTrigger value="profitability" className="gap-1">
-                          <Calculator className="w-4 h-4" />
-                          الربحية
-                        </TabsTrigger>
-                        <TabsTrigger value="financials" className="gap-1">
-                          <FileText className="w-4 h-4" />
-                          القوائم المالية
-                        </TabsTrigger>
-                        <TabsTrigger value="technical" className="gap-1">
-                          <CandlestickChart className="w-4 h-4" />
-                          الفني
-                        </TabsTrigger>
-                        <TabsTrigger value="historical" className="gap-1">
-                          <LineChart className="w-4 h-4" />
-                          التاريخي
-                        </TabsTrigger>
+                      <TabsList className="w-full justify-start flex-wrap h-auto gap-1 mb-4">
+                        <TabsTrigger value="overview" className="text-xs">نظرة عامة</TabsTrigger>
+                        <TabsTrigger value="performance" className="text-xs">الأداء</TabsTrigger>
+                        <TabsTrigger value="valuation" className="text-xs">التقييم</TabsTrigger>
+                        <TabsTrigger value="dividends" className="text-xs">التوزيعات</TabsTrigger>
+                        <TabsTrigger value="profitability" className="text-xs">الربحية</TabsTrigger>
+                        <TabsTrigger value="income" className="text-xs">قائمة الدخل</TabsTrigger>
+                        <TabsTrigger value="balance" className="text-xs">الميزانية</TabsTrigger>
+                        <TabsTrigger value="cashflow" className="text-xs">التدفق النقدي</TabsTrigger>
+                        <TabsTrigger value="technical" className="text-xs">التحليل الفني</TabsTrigger>
                       </TabsList>
 
-                      {/* Overview Tab */}
-                      <TabsContent value="overview" className="space-y-4">
+                      <TabsContent value="overview">
                         <div className="grid md:grid-cols-2 gap-4">
-                          <Card>
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm">معلومات أساسية</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-slate-50 rounded-lg p-3">
-                                  <div className="text-xs text-slate-500">السعر</div>
-                                  <div className="font-semibold">{String(stockDetail.stock.price || '-')}</div>
-                                </div>
-                                <div className="bg-slate-50 rounded-lg p-3">
-                                  <div className="text-xs text-slate-500">التغير</div>
-                                  <div className="font-semibold">{String(stockDetail.stock.change_percent || '-')}</div>
-                                </div>
-                                <div className="bg-slate-50 rounded-lg p-3">
-                                  <div className="text-xs text-slate-500">السوق</div>
-                                  <div className="font-semibold">{String(stockDetail.stock.market || '-')}</div>
-                                </div>
-                                <div className="bg-slate-50 rounded-lg p-3">
-                                  <div className="text-xs text-slate-500">الرمز</div>
-                                  <div className="font-semibold">{String(stockDetail.stock.symbol || '-')}</div>
-                                </div>
+                          {stockDetail?.stock && (
+                            <div className="space-y-3">
+                              <h3 className="font-semibold text-slate-700">معلومات السهم</h3>
+                              <div className="grid grid-cols-2 gap-2">
+                                {Object.entries(stockDetail.stock).map(([key, value]) => {
+                                  if (['id', 'created_at', 'updated_at', 'logo_url'].includes(key)) return null
+                                  return (
+                                    <div key={key} className="bg-slate-50 rounded p-2">
+                                      <div className="text-xs text-slate-500">{key}</div>
+                                      <div className="font-medium text-sm truncate">{String(value)}</div>
+                                    </div>
+                                  )
+                                })}
                               </div>
-                            </CardContent>
-                          </Card>
-
-                          <Card>
-                            <CardHeader className="pb-2">
-                              <CardTitle className="text-sm">التقييم السريع</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              {stockDetail.tabs.tab_valuation ? (
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div className="bg-slate-50 rounded-lg p-3">
-                                    <div className="text-xs text-slate-500">القيمة السوقية</div>
-                                    <div className="font-semibold">{String(stockDetail.tabs.tab_valuation.market_cap || '-')}</div>
-                                  </div>
-                                  <div className="bg-slate-50 rounded-lg p-3">
-                                    <div className="text-xs text-slate-500">مكرر الربحية</div>
-                                    <div className="font-semibold">{String(stockDetail.tabs.tab_valuation.pe_ratio || '-')}</div>
-                                  </div>
-                                  <div className="bg-slate-50 rounded-lg p-3">
-                                    <div className="text-xs text-slate-500">عائد التوزيعات</div>
-                                    <div className="font-semibold">{String(stockDetail.tabs.tab_dividends?.div_yield || '-')}</div>
-                                  </div>
-                                  <div className="bg-slate-50 rounded-lg p-3">
-                                    <div className="text-xs text-slate-500">التوصية الفنية</div>
-                                    <div className="font-semibold">{String(stockDetail.tabs.tab_technical_analysis?.technical_rating || '-')}</div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="text-slate-400 text-center py-4">لا توجد بيانات تقييم</div>
-                              )}
-                            </CardContent>
-                          </Card>
+                            </div>
+                          )}
                         </div>
                       </TabsContent>
 
-                      {/* Performance Tab */}
                       <TabsContent value="performance">
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className="text-sm flex items-center gap-2">
-                              <BarChart3 className="w-4 h-4" />
-                              بيانات الأداء
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            {renderDataGrid(stockDetail.tabs.tab_performance as Record<string, unknown>, PERFORMANCE_LABELS)}
-                          </CardContent>
-                        </Card>
+                        {renderDataGrid(stockDetail?.tabs?.performance as Record<string, unknown>, PERFORMANCE_LABELS)}
                       </TabsContent>
 
-                      {/* Valuation Tab */}
                       <TabsContent value="valuation">
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className="text-sm flex items-center gap-2">
-                              <DollarSign className="w-4 h-4" />
-                              بيانات التقييم
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            {renderDataGrid(stockDetail.tabs.tab_valuation as Record<string, unknown>, VALUATION_LABELS)}
-                          </CardContent>
-                        </Card>
+                        {renderDataGrid(stockDetail?.tabs?.valuation as Record<string, unknown>, VALUATION_LABELS)}
                       </TabsContent>
 
-                      {/* Dividends Tab */}
                       <TabsContent value="dividends">
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className="text-sm flex items-center gap-2">
-                              <Wallet className="w-4 h-4" />
-                              بيانات التوزيعات
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            {renderDataGrid(stockDetail.tabs.tab_dividends as Record<string, unknown>, DIVIDEND_LABELS)}
-                          </CardContent>
-                        </Card>
+                        {renderDataGrid(stockDetail?.tabs?.dividends as Record<string, unknown>, DIVIDEND_LABELS)}
                       </TabsContent>
 
-                      {/* Profitability Tab */}
                       <TabsContent value="profitability">
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className="text-sm flex items-center gap-2">
-                              <Calculator className="w-4 h-4" />
-                              بيانات الربحية
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            {renderDataGrid(stockDetail.tabs.tab_profitability as Record<string, unknown>, PROFITABILITY_LABELS)}
-                          </CardContent>
-                        </Card>
+                        {renderDataGrid(stockDetail?.tabs?.profitability as Record<string, unknown>, PROFITABILITY_LABELS)}
                       </TabsContent>
 
-                      {/* Financials Tab */}
-                      <TabsContent value="financials" className="space-y-4">
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className="text-sm">قائمة الدخل</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            {renderDataGrid(stockDetail.tabs.tab_income_statement as Record<string, unknown>, INCOME_LABELS)}
-                          </CardContent>
-                        </Card>
-                        
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className="text-sm">الميزانية العمومية</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            {renderDataGrid(stockDetail.tabs.tab_balance_sheet as Record<string, unknown>, BALANCE_LABELS)}
-                          </CardContent>
-                        </Card>
-                        
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className="text-sm">قائمة التدفقات النقدية</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            {renderDataGrid(stockDetail.tabs.tab_cash_flow as Record<string, unknown>, CASHFLOW_LABELS)}
-                          </CardContent>
-                        </Card>
+                      <TabsContent value="income">
+                        {renderDataGrid(stockDetail?.tabs?.income_statement as Record<string, unknown>, INCOME_LABELS)}
                       </TabsContent>
 
-                      {/* Technical Tab */}
+                      <TabsContent value="balance">
+                        {renderDataGrid(stockDetail?.tabs?.balance_sheet as Record<string, unknown>, BALANCE_LABELS)}
+                      </TabsContent>
+
+                      <TabsContent value="cashflow">
+                        {renderDataGrid(stockDetail?.tabs?.cash_flow as Record<string, unknown>, CASHFLOW_LABELS)}
+                      </TabsContent>
+
                       <TabsContent value="technical">
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className="text-sm flex items-center gap-2">
-                              <CandlestickChart className="w-4 h-4" />
-                              التحليل الفني
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            {renderDataGrid(stockDetail.tabs.tab_technical_analysis as Record<string, unknown>, TECHNICAL_LABELS)}
-                          </CardContent>
-                        </Card>
-                      </TabsContent>
-
-                      {/* Historical Tab */}
-                      <TabsContent value="historical">
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className="text-sm flex items-center gap-2">
-                              <LineChart className="w-4 h-4" />
-                              البيانات التاريخية (آخر 30 يوم)
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            {stockDetail.historical && stockDetail.historical.length > 0 ? (
-                              <div className="overflow-x-auto">
-                                <table className="w-full">
-                                  <thead className="bg-slate-100">
-                                    <tr>
-                                      <th className="px-3 py-2 text-right text-xs font-semibold">التاريخ</th>
-                                      <th className="px-3 py-2 text-right text-xs font-semibold">الافتتاح</th>
-                                      <th className="px-3 py-2 text-right text-xs font-semibold">الأعلى</th>
-                                      <th className="px-3 py-2 text-right text-xs font-semibold">الأدنى</th>
-                                      <th className="px-3 py-2 text-right text-xs font-semibold">الإغلاق</th>
-                                      <th className="px-3 py-2 text-right text-xs font-semibold">الحجم</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-slate-100">
-                                    {stockDetail.historical.map((row, i) => (
-                                      <tr key={i} className="hover:bg-slate-50">
-                                        <td className="px-3 py-2 text-sm">{String(row.date || '-')}</td>
-                                        <td className="px-3 py-2 text-sm">{String(row.open || '-')}</td>
-                                        <td className="px-3 py-2 text-sm text-green-600">{String(row.high || '-')}</td>
-                                        <td className="px-3 py-2 text-sm text-red-600">{String(row.low || '-')}</td>
-                                        <td className="px-3 py-2 text-sm font-medium">{String(row.close || '-')}</td>
-                                        <td className="px-3 py-2 text-sm">{String(row.volume || '-')}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              <div className="text-slate-400 text-center py-4">لا توجد بيانات تاريخية</div>
-                            )}
-                          </CardContent>
-                        </Card>
+                        {renderDataGrid(stockDetail?.tabs?.technical as Record<string, unknown>, TECHNICAL_LABELS)}
                       </TabsContent>
                     </Tabs>
                   </div>
-                ) : (
-                  <div className="p-6 text-center text-slate-500">لا توجد بيانات</div>
-                )}
-              </ScrollArea>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Analysis Detail Modal */}
+      {selectedRecommendation && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 border-b">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    {selectedRecommendation.symbol}
+                    <Badge className={getActionColor(selectedRecommendation.action)}>
+                      {selectedRecommendation.action === 'BUY' ? 'شراء' : 
+                       selectedRecommendation.action === 'SELL' ? 'بيع' : 'انتظار'}
+                    </Badge>
+                  </CardTitle>
+                  <p className="text-sm text-slate-600 mt-1">{selectedRecommendation.name}</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setSelectedRecommendation(null)}>
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 overflow-y-auto max-h-[70vh]">
+              {/* Master Score */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-slate-700">درجة التحليل الشاملة</span>
+                  <span className={`text-2xl font-bold ${getScoreColor(selectedRecommendation.master_score)}`}>
+                    {selectedRecommendation.master_score.toFixed(0)}%
+                  </span>
+                </div>
+                <Progress value={selectedRecommendation.master_score} className="h-3" />
+              </div>
+
+              {/* Scores Breakdown */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-slate-600">التحليل الفني</span>
+                    <span className="font-bold text-slate-800">{selectedRecommendation.technical_score.toFixed(0)}%</span>
+                  </div>
+                  <Progress value={selectedRecommendation.technical_score} className="h-2" />
+                </div>
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-slate-600">التحليل الأساسي</span>
+                    <span className="font-bold text-slate-800">{selectedRecommendation.fundamental_score.toFixed(0)}%</span>
+                  </div>
+                  <Progress value={selectedRecommendation.fundamental_score} className="h-2" />
+                </div>
+              </div>
+
+              {/* Price Levels */}
+              <div className="mb-6">
+                <h4 className="font-semibold text-slate-700 mb-3">مستويات السعر</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                    <div className="text-xs text-blue-600 mb-1">سعر الدخول</div>
+                    <div className="text-lg font-bold text-blue-700">{formatPrice(selectedRecommendation.entry_price)}</div>
+                  </div>
+                  <div className="bg-red-50 rounded-lg p-3 border border-red-200">
+                    <div className="text-xs text-red-600 mb-1">وقف الخسارة</div>
+                    <div className="text-lg font-bold text-red-700">{formatPrice(selectedRecommendation.stop_loss)}</div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                    <div className="text-xs text-green-600 mb-1">الهدف الأول</div>
+                    <div className="text-lg font-bold text-green-700">{formatPrice(selectedRecommendation.take_profit_1)}</div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                    <div className="text-xs text-green-600 mb-1">الهدف الثاني</div>
+                    <div className="text-lg font-bold text-green-700">{formatPrice(selectedRecommendation.take_profit_2)}</div>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-3 border border-green-200 col-span-2">
+                    <div className="text-xs text-green-600 mb-1">الهدف الثالث</div>
+                    <div className="text-lg font-bold text-green-700">{formatPrice(selectedRecommendation.take_profit_3)}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Risk Management */}
+              <div className="mb-6">
+                <h4 className="font-semibold text-slate-700 mb-3">إدارة المخاطر</h4>
+                <div className="bg-slate-50 rounded-lg p-3 grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-xs text-slate-500">حجم المركز المقترح</span>
+                    <div className="font-semibold text-slate-800">{selectedRecommendation.position_size_percent.toFixed(1)}%</div>
+                  </div>
+                  <div>
+                    <span className="text-xs text-slate-500">مستوى الثقة</span>
+                    <div className="font-semibold text-slate-800 flex items-center gap-1">
+                      <div className={`w-2 h-2 rounded-full ${getConfidenceColor(selectedRecommendation.confidence)}`}></div>
+                      {selectedRecommendation.confidence === 'HIGH' ? 'عالية' : 
+                       selectedRecommendation.confidence === 'MEDIUM' ? 'متوسطة' : 'منخفضة'}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-xs text-slate-500">اتجاه السوق</span>
+                    <div className="font-semibold text-slate-800">
+                      {selectedRecommendation.market_regime === 'bull' ? '🐂 صاعد' : 
+                       selectedRecommendation.market_regime === 'bear' ? '🐻 هابط' : '📊 عرضي'}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-xs text-slate-500">يناسب شخصيتك</span>
+                    <div className="font-semibold">
+                      {selectedRecommendation.personality_match ? (
+                        <span className="text-green-600">✓ نعم</span>
+                      ) : (
+                        <span className="text-red-600">✗ لا</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Signals */}
+              {selectedRecommendation.signals.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="font-semibold text-slate-700 mb-3">إشارات إيجابية</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedRecommendation.signals.map((signal, i) => (
+                      <Badge key={i} variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                        {signal}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Warnings */}
+              {selectedRecommendation.warnings.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="font-semibold text-slate-700 mb-3">تحذيرات</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedRecommendation.warnings.map((warning, i) => (
+                      <Badge key={i} variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                        {warning}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Reason */}
+              <div className="bg-primary/5 rounded-lg p-4 border border-primary/20">
+                <h4 className="font-semibold text-slate-700 mb-2">السبب</h4>
+                <p className="text-slate-600">{selectedRecommendation.reason}</p>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -1310,7 +1627,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="bg-white border-t py-4 mt-auto">
         <div className="container mx-auto px-4 text-center text-sm text-slate-500">
-          Data Engine © 2024 - الأسواق العربية: السعودية 🇸🇦 | مصر 🇪🇬 | الكويت 🇰🇼 | قطر 🇶🇦
+          محرك البيانات والتحليلات - الأسواق العربية
         </div>
       </footer>
     </div>
