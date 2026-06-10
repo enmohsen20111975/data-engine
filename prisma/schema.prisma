@@ -119,3 +119,56 @@ model BtcLocalPrice {
   @@unique([timestamp, currency])
   @@map("btc_local_prices")
 }
+
+// Telegram Models - نماذج تيليجرام
+
+model TelegramMessage {
+  id          Int      @id @default(autoincrement())
+  messageId   Int      @map("message_id")
+  channel     String
+  text        String?
+  date        String?
+  views       Int?
+  forwards    Int?
+  replies     Int?
+  processed   Boolean  @default(false)
+  processedAt String?  @map("processed_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([channel, messageId])
+  @@map("telegram_messages")
+}
+
+model TelegramSignal {
+  id            Int      @id @default(autoincrement())
+  messageId     Int      @map("message_id")
+  channel       String
+  symbol        String
+  market        String?
+  signalType    String   @map("signal_type") // buy, sell, hold, accumulate, distribute
+  price         Float?
+  targetPrice   Float?   @map("target_price")
+  stopLoss      Float?   @map("stop_loss")
+  confidence    Float?
+  reasoning     String?
+  rawText       String?  @map("raw_text")
+  date          String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("telegram_signals")
+}
+
+model TelegramNews {
+  id          Int      @id @default(autoincrement())
+  messageId   Int      @map("message_id")
+  channel     String
+  title       String?
+  summary     String?
+  sentiment   String?  // positive, negative, neutral
+  symbols     String?  // JSON array of mentioned symbols
+  rawText     String?  @map("raw_text")
+  date        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("telegram_news")
+}
