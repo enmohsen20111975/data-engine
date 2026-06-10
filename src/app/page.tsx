@@ -297,6 +297,14 @@ export default function Home() {
   const [telegramPassword, setTelegramPassword] = useState('')
   const [telegramAuthStep, setTelegramAuthStep] = useState<'phone' | 'code' | 'password' | 'done'>('phone')
   const [showPassword, setShowPassword] = useState(false)
+  // New Telegram features
+  const [telegramChannelList, setTelegramChannelList] = useState<any[]>([])
+  const [selectedChannelIds, setSelectedChannelIds] = useState<number[]>([])
+  const [daysBack, setDaysBack] = useState('30')
+  const [channelFilter, setChannelFilter] = useState('')
+  const [marketFilter, setMarketFilter] = useState('all')
+  const [contentTypeFilter, setContentTypeFilter] = useState('all')
+  const [processedData, setProcessedData] = useState<any>(null)
 
   // Fetch database stats
   const fetchDbStats = async () => {
@@ -520,6 +528,103 @@ export default function Home() {
       } else {
         setTelegramMessages(data.messages || [])
         setTelegramSuccess(`تم سحب ${data.messages?.length || 0} رسالة من ${data.channels_scraped || 0} قناة`)
+      }
+    } catch (error) {
+      setTelegramError(String(error))
+    }
+    setTelegramLoading(false)
+  }
+
+  // List Telegram channels
+  const listTelegramChannels = async () => {
+    setTelegramLoading(true)
+    setTelegramError(null)
+    try {
+      const res = await fetch('/api/telegram/channels')
+      const data = await res.json()
+      
+      if (data.error) {
+        setTelegramError(data.error)
+      } else {
+        setTelegramChannelList(data.channels || [])
+        setTelegramSuccess(`تم العثور على ${data.channels?.length || 0} قناة/مجموعة`)
+      }
+    } catch (error) {
+      setTelegramError(String(error))
+    }
+    setTelegramLoading(false)
+  }
+
+  // Scrape selected channels
+  const scrapeSelectedChannels = async () => {
+    const selectedChannels = telegramChannelList
+      .filter(ch => selectedChannelIds.includes(ch.id))
+      .map(ch => ch.link || ch.username || `@${ch.name}`)
+    
+    if (selectedChannels.length === 0) {
+      setTelegramError('يجب اختيار قناة واحدة على الأقل')
+      return
+    }
+    
+    setTelegramLoading(true)
+    setTelegramError(null)
+    setTelegramSuccess(null)
+    setTelegramMessages([])
+    
+    try {
+      const res = await fetch('/api/telegram/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channels: selectedChannels,
+          limit: parseInt(telegramLimit) || 50,
+          days_back: parseInt(daysBack) || 30
+        })
+      })
+      const data = await res.json()
+      
+      if (data.error) {
+        setTelegramError(data.error)
+      } else {
+        setTelegramMessages(data.messages || [])
+        setTelegramSuccess(`تم سحب ${data.messages?.length || 0} رسالة`)
+      }
+    } catch (error) {
+      setTelegramError(String(error))
+    }
+    setTelegramLoading(false)
+  }
+
+  // Process messages with AI
+  const processMessages = async () => {
+    if (telegramMessages.length === 0) {
+      setTelegramError('لا توجد رسائل للمعالجة')
+      return
+    }
+    
+    setTelegramLoading(true)
+    setTelegramError(null)
+    
+    try {
+      // First save messages to database
+      await fetch('/api/telegram/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: telegramMessages })
+      })
+      
+      // Then process them
+      const processRes = await fetch('/api/telegram/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      const data = await processRes.json()
+      
+      if (data.error) {
+        setTelegramError(data.error)
+      } else {
+        setProcessedData(data)
+        setTelegramSuccess(`تمت معالجة ${data.processed} رسالة: ${data.signalsCreated} إشارة، ${data.newsCreated} خبر`)
       }
     } catch (error) {
       setTelegramError(String(error))
@@ -1534,14 +1639,20 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 {telegramAuthStatus?.authenticated ? (
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="w-6 h-6 text-green-500" />
-                    <div>
-                      <div className="font-medium text-green-700">متصل</div>
-                      <div className="text-sm text-slate-500">
-                        {telegramAuthStatus.phone || 'الحساب جاهز للسحب'}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="w-6 h-6 text-green-500" />
+                      <div>
+                        <div className="font-medium text-green-700">متصل</div>
+                        <div className="text-sm text-slate-500">
+                          {telegramAuthStatus.phone || 'الحساب جاهز للسحب'}
+                        </div>
                       </div>
                     </div>
+                    <Button onClick={listTelegramChannels} disabled={telegramLoading} variant="outline" className="gap-2">
+                      {telegramLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+                      عرض القنوات
+                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -1617,28 +1728,167 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            {/* Scrape Form */}
+            {/* Channel List */}
+            {telegramChannelList.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Users className="w-5 h-5 text-primary" />
+                      القنوات المتاحة ({telegramChannelList.length})
+                    </span>
+                    <Badge variant="secondary">{selectedChannelIds.length} محدد</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Filters */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <Input
+                      placeholder="بحث بالاسم..."
+                      value={channelFilter}
+                      onChange={(e) => setChannelFilter(e.target.value)}
+                    />
+                    <Select value={marketFilter} onValueChange={setMarketFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="السوق" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">كل الأسواق</SelectItem>
+                        <SelectItem value="saudi">🇸🇦 السعودي</SelectItem>
+                        <SelectItem value="egypt">🇪🇬 المصري</SelectItem>
+                        <SelectItem value="kuwait">🇰🇼 الكويتي</SelectItem>
+                        <SelectItem value="qatar">🇶🇦 القطري</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={contentTypeFilter} onValueChange={setContentTypeFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="نوع المحتوى" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">الكل</SelectItem>
+                        <SelectItem value="stocks">📈 أسهم</SelectItem>
+                        <SelectItem value="crypto">🪙 عملات رقمية</SelectItem>
+                        <SelectItem value="news">📰 أخبار</SelectItem>
+                        <SelectItem value="general">📋 عام</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          const filteredIds = telegramChannelList
+                            .filter(ch => {
+                              if (marketFilter !== 'all' && ch.market !== marketFilter) return false
+                              if (contentTypeFilter !== 'all' && ch.content_type !== contentTypeFilter) return false
+                              if (channelFilter && !ch.name.toLowerCase().includes(channelFilter.toLowerCase())) return false
+                              return true
+                            })
+                            .map(ch => ch.id)
+                          setSelectedChannelIds(filteredIds)
+                        }}
+                      >
+                        تحديد الكل
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setSelectedChannelIds([])}
+                      >
+                        إلغاء التحديد
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Channel Grid */}
+                  <ScrollArea className="h-64">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {telegramChannelList
+                        .filter(ch => {
+                          if (marketFilter !== 'all' && ch.market !== marketFilter) return false
+                          if (contentTypeFilter !== 'all' && ch.content_type !== contentTypeFilter) return false
+                          if (channelFilter && !ch.name.toLowerCase().includes(channelFilter.toLowerCase())) return false
+                          return true
+                        })
+                        .map((channel) => (
+                          <div 
+                            key={channel.id}
+                            className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                              selectedChannelIds.includes(channel.id) 
+                                ? 'border-primary bg-primary/5' 
+                                : 'border-slate-200 hover:border-slate-300'
+                            }`}
+                            onClick={() => {
+                              setSelectedChannelIds(prev => 
+                                prev.includes(channel.id) 
+                                  ? prev.filter(id => id !== channel.id)
+                                  : [...prev, channel.id]
+                              )
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={selectedChannelIds.includes(channel.id)}
+                                onChange={() => {}}
+                                className="w-4 h-4"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{channel.name}</div>
+                                <div className="flex items-center gap-2 text-xs text-slate-500">
+                                  {channel.members && <span>{channel.members.toLocaleString()} عضو</span>}
+                                  {channel.market && channel.market !== 'unknown' && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {channel.market === 'saudi' ? '🇸🇦' : 
+                                       channel.market === 'egypt' ? '🇪🇬' : 
+                                       channel.market === 'kuwait' ? '🇰🇼' : 
+                                       channel.market === 'qatar' ? '🇶🇦' : ''}
+                                    </Badge>
+                                  )}
+                                  {channel.content_type && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {channel.content_type === 'stocks' ? '📈' :
+                                       channel.content_type === 'crypto' ? '🪙' :
+                                       channel.content_type === 'news' ? '📰' : '📋'}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Scrape Settings */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Download className="w-5 h-5 text-primary" />
-                  سحب الرسائل من القنوات
+                  إعدادات السحب
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">روابط القنوات (كل رابط في سطر)</label>
-                  <Textarea
-                    placeholder="https://t.me/channel1&#10;https://t.me/channel2&#10;@channel3"
-                    value={telegramChannels}
-                    onChange={(e) => setTelegramChannels(e.target.value)}
-                    rows={4}
-                    dir="ltr"
-                  />
-                </div>
-                
-                <div className="flex gap-4">
-                  <div className="flex-1">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">عدد الأيام من الماضي</label>
+                    <Select value={daysBack} onValueChange={setDaysBack}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="7">7 أيام</SelectItem>
+                        <SelectItem value="14">14 يوم</SelectItem>
+                        <SelectItem value="30">30 يوم</SelectItem>
+                        <SelectItem value="60">60 يوم</SelectItem>
+                        <SelectItem value="90">90 يوم</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
                     <label className="text-sm font-medium text-slate-700">عدد الرسائل لكل قناة</label>
                     <Input
                       type="number"
@@ -1649,9 +1899,9 @@ export default function Home() {
                   </div>
                   <div className="flex items-end">
                     <Button 
-                      onClick={scrapeTelegram} 
+                      onClick={selectedChannelIds.length > 0 ? scrapeSelectedChannels : scrapeTelegram} 
                       disabled={telegramLoading || !telegramAuthStatus?.authenticated}
-                      className="gap-2"
+                      className="gap-2 w-full"
                     >
                       {telegramLoading ? (
                         <>
@@ -1667,6 +1917,20 @@ export default function Home() {
                     </Button>
                   </div>
                 </div>
+
+                {/* Manual channel input */}
+                {selectedChannelIds.length === 0 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">أو أدخل روابط القنوات يدوياً:</label>
+                    <Textarea
+                      placeholder="https://t.me/channel1&#10;https://t.me/channel2&#10;@channel3"
+                      value={telegramChannels}
+                      onChange={(e) => setTelegramChannels(e.target.value)}
+                      rows={3}
+                      dir="ltr"
+                    />
+                  </div>
+                )}
 
                 {/* Status Messages */}
                 {telegramError && (
@@ -1689,9 +1953,15 @@ export default function Home() {
             {telegramMessages.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <MessageCircle className="w-5 h-5 text-primary" />
-                    الرسائل المسحوبة ({telegramMessages.length})
+                  <CardTitle className="text-base flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <MessageCircle className="w-5 h-5 text-primary" />
+                      الرسائل المسحوبة ({telegramMessages.length})
+                    </span>
+                    <Button onClick={processMessages} disabled={telegramLoading} variant="default" className="gap-2">
+                      <Sparkles className="w-4 h-4" />
+                      معالجة بالذكاء الاصطناعي
+                    </Button>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -1703,7 +1973,7 @@ export default function Home() {
                             <Badge variant="outline">{msg.channel}</Badge>
                             <span className="text-xs text-slate-500">{formatDate(msg.date)}</span>
                           </div>
-                          <p className="text-sm text-slate-700 whitespace-pre-wrap">{msg.text}</p>
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap line-clamp-3">{msg.text}</p>
                           {msg.views && (
                             <div className="text-xs text-slate-500 mt-2">
                               👁️ {msg.views.toLocaleString()} مشاهدة
@@ -1713,6 +1983,34 @@ export default function Home() {
                       ))}
                     </div>
                   </ScrollArea>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Processed Data */}
+            {processedData && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                    البيانات المعالجة
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div className="text-center p-4 bg-blue-50 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">{processedData.processed}</div>
+                      <div className="text-sm text-slate-600">رسالة معالجة</div>
+                    </div>
+                    <div className="text-center p-4 bg-green-50 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600">{processedData.signalsCreated}</div>
+                      <div className="text-sm text-slate-600">إشارة تداول</div>
+                    </div>
+                    <div className="text-center p-4 bg-purple-50 rounded-lg">
+                      <div className="text-2xl font-bold text-purple-600">{processedData.newsCreated}</div>
+                      <div className="text-sm text-slate-600">خبر</div>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             )}
