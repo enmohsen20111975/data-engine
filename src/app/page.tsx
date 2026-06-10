@@ -9,13 +9,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { 
   Database, Newspaper, Table, TrendingUp, TrendingDown,
   ChevronLeft, ChevronRight, ExternalLink, Clock, Building2,
   Activity, RefreshCw, HardDrive, FileSpreadsheet, CheckCircle2,
   XCircle, AlertTriangle, Zap, X, BarChart3, DollarSign,
   PieChart, LineChart, FileText, Calculator, Wallet, CandlestickChart,
-  Target, Shield, AlertCircle, Sparkles, Gauge, Users
+  Target, Shield, AlertCircle, Sparkles, Gauge, Users, Send,
+  MessageCircle, Download, Loader2, Eye, EyeOff
 } from 'lucide-react'
 
 // Types
@@ -96,6 +99,18 @@ interface AnalysisRecommendation {
   position_size_percent: number
   technical_score: number
   fundamental_score: number
+  quantitative_score?: number
+  sentiment_score?: number
+  volume_profile_score?: number
+  order_flow_score?: number
+  volatility_score?: number
+  trend_score?: number
+  momentum_score?: number
+  pe_score?: number
+  pb_score?: number
+  roa_score?: number
+  roe_score?: number
+  dividend_score?: number
   signals: string[]
   warnings: string[]
   reason: string
@@ -109,6 +124,14 @@ interface MarketAnalysisResult {
   personality: string
   total_recommendations: number
   recommendations: AnalysisRecommendation[]
+}
+
+interface TelegramMessage {
+  id: number
+  channel: string
+  text: string
+  date: string
+  views?: number
 }
 
 // Market flags and colors
@@ -261,6 +284,20 @@ export default function Home() {
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const [selectedRecommendation, setSelectedRecommendation] = useState<AnalysisRecommendation | null>(null)
 
+  // Telegram state
+  const [telegramChannels, setTelegramChannels] = useState('')
+  const [telegramLimit, setTelegramLimit] = useState('50')
+  const [telegramLoading, setTelegramLoading] = useState(false)
+  const [telegramMessages, setTelegramMessages] = useState<TelegramMessage[]>([])
+  const [telegramError, setTelegramError] = useState<string | null>(null)
+  const [telegramSuccess, setTelegramSuccess] = useState<string | null>(null)
+  const [telegramAuthStatus, setTelegramAuthStatus] = useState<any>(null)
+  const [telegramPhone, setTelegramPhone] = useState('')
+  const [telegramCode, setTelegramCode] = useState('')
+  const [telegramPassword, setTelegramPassword] = useState('')
+  const [telegramAuthStep, setTelegramAuthStep] = useState<'phone' | 'code' | 'password' | 'done'>('phone')
+  const [showPassword, setShowPassword] = useState(false)
+
   // Fetch database stats
   const fetchDbStats = async () => {
     try {
@@ -374,6 +411,122 @@ export default function Home() {
     setAnalysisLoading(false)
   }
 
+  // Telegram functions
+  const checkTelegramAuth = async () => {
+    try {
+      const res = await fetch('/api/telegram/auth/status')
+      const data = await res.json()
+      setTelegramAuthStatus(data)
+      if (data.authenticated) {
+        setTelegramAuthStep('done')
+      }
+    } catch (error) {
+      console.error('Error checking telegram auth:', error)
+    }
+  }
+
+  const startTelegramAuth = async () => {
+    setTelegramLoading(true)
+    setTelegramError(null)
+    try {
+      const res = await fetch('/api/telegram/auth/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: telegramPhone })
+      })
+      const data = await res.json()
+      if (data.error) {
+        setTelegramError(data.error)
+      } else {
+        setTelegramAuthStep('code')
+        setTelegramSuccess('تم إرسال كود التحقق إلى التيليجرام')
+      }
+    } catch (error) {
+      setTelegramError(String(error))
+    }
+    setTelegramLoading(false)
+  }
+
+  const verifyTelegramCode = async () => {
+    setTelegramLoading(true)
+    setTelegramError(null)
+    try {
+      const res = await fetch('/api/telegram/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: telegramPhone, code: telegramCode })
+      })
+      const data = await res.json()
+      if (data.error) {
+        if (data.needs_password) {
+          setTelegramAuthStep('password')
+        } else {
+          setTelegramError(data.error)
+        }
+      } else {
+        setTelegramAuthStep('done')
+        setTelegramSuccess('تم تسجيل الدخول بنجاح!')
+        checkTelegramAuth()
+      }
+    } catch (error) {
+      setTelegramError(String(error))
+    }
+    setTelegramLoading(false)
+  }
+
+  const verifyTelegramPassword = async () => {
+    setTelegramLoading(true)
+    setTelegramError(null)
+    try {
+      const res = await fetch('/api/telegram/auth/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: telegramPhone, password: telegramPassword })
+      })
+      const data = await res.json()
+      if (data.error) {
+        setTelegramError(data.error)
+      } else {
+        setTelegramAuthStep('done')
+        setTelegramSuccess('تم تسجيل الدخول بنجاح!')
+        checkTelegramAuth()
+      }
+    } catch (error) {
+      setTelegramError(String(error))
+    }
+    setTelegramLoading(false)
+  }
+
+  const scrapeTelegram = async () => {
+    setTelegramLoading(true)
+    setTelegramError(null)
+    setTelegramSuccess(null)
+    setTelegramMessages([])
+    
+    try {
+      const channels = telegramChannels.split('\n').map(c => c.trim()).filter(c => c)
+      const res = await fetch('/api/telegram/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channels,
+          limit: parseInt(telegramLimit) || 50
+        })
+      })
+      const data = await res.json()
+      
+      if (data.error) {
+        setTelegramError(data.error)
+      } else {
+        setTelegramMessages(data.messages || [])
+        setTelegramSuccess(`تم سحب ${data.messages?.length || 0} رسالة من ${data.channels_scraped || 0} قناة`)
+      }
+    } catch (error) {
+      setTelegramError(String(error))
+    }
+    setTelegramLoading(false)
+  }
+
   // Initial load
   useEffect(() => {
     const init = async () => {
@@ -381,7 +534,8 @@ export default function Home() {
       await Promise.all([
         fetchDbStats(),
         fetchDbReport(),
-        fetchRefreshStatus()
+        fetchRefreshStatus(),
+        checkTelegramAuth()
       ])
       setLoading(false)
     }
@@ -433,7 +587,7 @@ export default function Home() {
       fetchStocks().then(() => setLoading(false))
     } else if (tab === 'news') {
       fetchNews().then(() => setLoading(false))
-    } else if (tab === 'analysis') {
+    } else if (tab === 'analysis' || tab === 'telegram') {
       setLoading(false)
     } else {
       Promise.all([
@@ -538,6 +692,13 @@ export default function Home() {
     return 'text-red-600'
   }
 
+  const getScoreBgColor = (score: number) => {
+    if (score >= 80) return 'bg-green-50 border-green-200'
+    if (score >= 65) return 'bg-yellow-50 border-yellow-200'
+    if (score >= 50) return 'bg-orange-50 border-orange-200'
+    return 'bg-red-50 border-red-200'
+  }
+
   const getPersonalityInfo = (value: string) => {
     return PERSONALITY_TYPES.find(p => p.value === value) || PERSONALITY_TYPES[2]
   }
@@ -609,7 +770,7 @@ export default function Home() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 flex-1">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 max-w-2xl mx-auto">
+          <TabsList className="grid w-full grid-cols-5 max-w-3xl mx-auto">
             <TabsTrigger value="dashboard" className="gap-2">
               <Activity className="w-4 h-4" />
               لوحة التحكم
@@ -625,6 +786,10 @@ export default function Home() {
             <TabsTrigger value="analysis" className="gap-2">
               <BarChart3 className="w-4 h-4" />
               التحليلات
+            </TabsTrigger>
+            <TabsTrigger value="telegram" className="gap-2">
+              <Send className="w-4 h-4" />
+              تيليجرام
             </TabsTrigger>
           </TabsList>
 
@@ -1107,14 +1272,14 @@ export default function Home() {
             </div>
           </TabsContent>
 
-          {/* Analysis Tab */}
+          {/* Analysis Tab - Enhanced */}
           <TabsContent value="analysis" className="space-y-6">
             {/* Analysis Controls */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-primary" />
-                  محرك التحليل الذكي
+                  محرك التحليل الذكي الموحد
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1183,16 +1348,26 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Personality Info */}
+                {/* Analysis Weights Info */}
                 <div className="mt-4 p-3 bg-slate-50 rounded-lg">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Users className="w-4 h-4 text-slate-500" />
-                    <span className="font-medium text-slate-700">
-                      {getPersonalityInfo(analysisPersonality).label}:
-                    </span>
-                    <span className="text-slate-600">
-                      {getPersonalityInfo(analysisPersonality).description}
-                    </span>
+                  <div className="text-sm font-medium text-slate-700 mb-2">أوزان التحليل:</div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="gap-1">
+                      <CandlestickChart className="w-3 h-3" />
+                      الفني 30%
+                    </Badge>
+                    <Badge variant="outline" className="gap-1">
+                      <Calculator className="w-3 h-3" />
+                      الأساسي 25%
+                    </Badge>
+                    <Badge variant="outline" className="gap-1">
+                      <LineChart className="w-3 h-3" />
+                      الكمي 15%
+                    </Badge>
+                    <Badge variant="outline" className="gap-1">
+                      <MessageCircle className="w-3 h-3" />
+                      المعنوي 30%
+                    </Badge>
                   </div>
                 </div>
               </CardContent>
@@ -1265,10 +1440,10 @@ export default function Home() {
                           </Badge>
                         </div>
 
-                        {/* Score */}
+                        {/* Master Score */}
                         <div className="mb-3">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm text-slate-600">درجة التحليل</span>
+                            <span className="text-sm text-slate-600">درجة التحليل الشاملة</span>
                             <span className={`text-lg font-bold ${getScoreColor(rec.master_score)}`}>
                               {rec.master_score.toFixed(0)}%
                             </span>
@@ -1276,15 +1451,19 @@ export default function Home() {
                           <Progress value={rec.master_score} className="h-2" />
                         </div>
 
-                        {/* Scores Grid */}
+                        {/* Detailed Scores Grid */}
                         <div className="grid grid-cols-2 gap-2 mb-3">
-                          <div className="bg-slate-50 rounded p-2 text-center">
+                          <div className={`rounded p-2 text-center border ${getScoreBgColor(rec.technical_score)}`}>
                             <div className="text-xs text-slate-500">الفني</div>
-                            <div className="font-semibold text-slate-800">{rec.technical_score.toFixed(0)}%</div>
+                            <div className={`font-bold ${getScoreColor(rec.technical_score)}`}>
+                              {rec.technical_score.toFixed(0)}%
+                            </div>
                           </div>
-                          <div className="bg-slate-50 rounded p-2 text-center">
+                          <div className={`rounded p-2 text-center border ${getScoreBgColor(rec.fundamental_score)}`}>
                             <div className="text-xs text-slate-500">الأساسي</div>
-                            <div className="font-semibold text-slate-800">{rec.fundamental_score.toFixed(0)}%</div>
+                            <div className={`font-bold ${getScoreColor(rec.fundamental_score)}`}>
+                              {rec.fundamental_score.toFixed(0)}%
+                            </div>
                           </div>
                         </div>
 
@@ -1328,7 +1507,7 @@ export default function Home() {
               <Card>
                 <CardContent className="p-12 text-center">
                   <BarChart3 className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-slate-700 mb-2">محرك التحليل الذكي</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 mb-2">محرك التحليل الذكي الموحد</h3>
                   <p className="text-slate-500 mb-4">
                     اختر السوق وشخصية المستثمر ثم اضغط على &quot;تشغيل التحليل&quot;
                   </p>
@@ -1338,6 +1517,202 @@ export default function Home() {
                     <Badge variant="outline">تحليل كمي 15%</Badge>
                     <Badge variant="outline">تحليل معنوي 30%</Badge>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Telegram Tab */}
+          <TabsContent value="telegram" className="space-y-6">
+            {/* Auth Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Send className="w-5 h-5 text-primary" />
+                  حالة الاتصال بتيليجرام
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {telegramAuthStatus?.authenticated ? (
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-green-500" />
+                    <div>
+                      <div className="font-medium text-green-700">متصل</div>
+                      <div className="text-sm text-slate-500">
+                        {telegramAuthStatus.phone || 'الحساب جاهز للسحب'}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {telegramAuthStep === 'phone' && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-yellow-600">
+                          <AlertCircle className="w-5 h-5" />
+                          <span>يجب تسجيل الدخول أولاً</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="رقم الهاتف (مثال: +201234567890)"
+                            value={telegramPhone}
+                            onChange={(e) => setTelegramPhone(e.target.value)}
+                            className="flex-1"
+                            dir="ltr"
+                          />
+                          <Button onClick={startTelegramAuth} disabled={telegramLoading}>
+                            {telegramLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'إرسال الكود'}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {telegramAuthStep === 'code' && (
+                      <div className="space-y-3">
+                        <div className="text-sm text-slate-600">تم إرسال كود التحقق إلى التيليجرام</div>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="أدخل الكود"
+                            value={telegramCode}
+                            onChange={(e) => setTelegramCode(e.target.value)}
+                            className="flex-1"
+                            dir="ltr"
+                          />
+                          <Button onClick={verifyTelegramCode} disabled={telegramLoading}>
+                            {telegramLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'تحقق'}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {telegramAuthStep === 'password' && (
+                      <div className="space-y-3">
+                        <div className="text-sm text-slate-600">الحساب محمي بكلمة مرور</div>
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Input
+                              type={showPassword ? 'text' : 'password'}
+                              placeholder="كلمة مرور التحقق الثنائي"
+                              value={telegramPassword}
+                              onChange={(e) => setTelegramPassword(e.target.value)}
+                              dir="ltr"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute left-0 top-0 h-full px-2"
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </Button>
+                          </div>
+                          <Button onClick={verifyTelegramPassword} disabled={telegramLoading}>
+                            {telegramLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'تحقق'}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Scrape Form */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Download className="w-5 h-5 text-primary" />
+                  سحب الرسائل من القنوات
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">روابط القنوات (كل رابط في سطر)</label>
+                  <Textarea
+                    placeholder="https://t.me/channel1&#10;https://t.me/channel2&#10;@channel3"
+                    value={telegramChannels}
+                    onChange={(e) => setTelegramChannels(e.target.value)}
+                    rows={4}
+                    dir="ltr"
+                  />
+                </div>
+                
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="text-sm font-medium text-slate-700">عدد الرسائل لكل قناة</label>
+                    <Input
+                      type="number"
+                      value={telegramLimit}
+                      onChange={(e) => setTelegramLimit(e.target.value)}
+                      placeholder="50"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button 
+                      onClick={scrapeTelegram} 
+                      disabled={telegramLoading || !telegramAuthStatus?.authenticated}
+                      className="gap-2"
+                    >
+                      {telegramLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          جاري السحب...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-4 h-4" />
+                          سحب الرسائل
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Status Messages */}
+                {telegramError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center gap-2">
+                    <XCircle className="w-5 h-5" />
+                    {telegramError}
+                  </div>
+                )}
+
+                {telegramSuccess && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5" />
+                    {telegramSuccess}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Messages List */}
+            {telegramMessages.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <MessageCircle className="w-5 h-5 text-primary" />
+                    الرسائل المسحوبة ({telegramMessages.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-96">
+                    <div className="space-y-3">
+                      {telegramMessages.map((msg) => (
+                        <div key={msg.id} className="p-3 bg-slate-50 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <Badge variant="outline">{msg.channel}</Badge>
+                            <span className="text-xs text-slate-500">{formatDate(msg.date)}</span>
+                          </div>
+                          <p className="text-sm text-slate-700 whitespace-pre-wrap">{msg.text}</p>
+                          {msg.views && (
+                            <div className="text-xs text-slate-500 mt-2">
+                              👁️ {msg.views.toLocaleString()} مشاهدة
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 </CardContent>
               </Card>
             )}
@@ -1472,10 +1847,10 @@ export default function Home() {
         </div>
       )}
 
-      {/* Analysis Detail Modal */}
+      {/* Analysis Detail Modal - Enhanced */}
       {selectedRecommendation && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-hidden">
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 border-b">
               <div className="flex items-center justify-between">
                 <div>
@@ -1497,36 +1872,124 @@ export default function Home() {
               {/* Master Score */}
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-slate-700">درجة التحليل الشاملة</span>
-                  <span className={`text-2xl font-bold ${getScoreColor(selectedRecommendation.master_score)}`}>
+                  <span className="font-semibold text-slate-700">🎯 درجة التحليل الشاملة (Master Score)</span>
+                  <span className={`text-3xl font-bold ${getScoreColor(selectedRecommendation.master_score)}`}>
                     {selectedRecommendation.master_score.toFixed(0)}%
                   </span>
                 </div>
-                <Progress value={selectedRecommendation.master_score} className="h-3" />
+                <Progress value={selectedRecommendation.master_score} className="h-4" />
               </div>
 
-              {/* Scores Breakdown */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-slate-600">التحليل الفني</span>
-                    <span className="font-bold text-slate-800">{selectedRecommendation.technical_score.toFixed(0)}%</span>
+              {/* Detailed Analysis Scores */}
+              <div className="mb-6">
+                <h4 className="font-semibold text-slate-700 mb-3">📊 تفاصيل درجات التحليل</h4>
+                
+                {/* Main Scores */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                  <div className={`rounded-lg p-3 border ${getScoreBgColor(selectedRecommendation.technical_score)}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <CandlestickChart className="w-4 h-4 text-slate-500" />
+                      <span className="text-sm text-slate-600">التحليل الفني</span>
+                    </div>
+                    <div className={`text-xl font-bold ${getScoreColor(selectedRecommendation.technical_score)}`}>
+                      {selectedRecommendation.technical_score.toFixed(0)}%
+                    </div>
+                    <Progress value={selectedRecommendation.technical_score} className="h-1.5 mt-2" />
                   </div>
-                  <Progress value={selectedRecommendation.technical_score} className="h-2" />
+                  
+                  <div className={`rounded-lg p-3 border ${getScoreBgColor(selectedRecommendation.fundamental_score)}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Calculator className="w-4 h-4 text-slate-500" />
+                      <span className="text-sm text-slate-600">التحليل الأساسي</span>
+                    </div>
+                    <div className={`text-xl font-bold ${getScoreColor(selectedRecommendation.fundamental_score)}`}>
+                      {selectedRecommendation.fundamental_score.toFixed(0)}%
+                    </div>
+                    <Progress value={selectedRecommendation.fundamental_score} className="h-1.5 mt-2" />
+                  </div>
+                  
+                  <div className={`rounded-lg p-3 border ${getScoreBgColor(selectedRecommendation.quantitative_score || 50)}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <LineChart className="w-4 h-4 text-slate-500" />
+                      <span className="text-sm text-slate-600">التحليل الكمي</span>
+                    </div>
+                    <div className={`text-xl font-bold ${getScoreColor(selectedRecommendation.quantitative_score || 50)}`}>
+                      {(selectedRecommendation.quantitative_score || 50).toFixed(0)}%
+                    </div>
+                    <Progress value={selectedRecommendation.quantitative_score || 50} className="h-1.5 mt-2" />
+                  </div>
+                  
+                  <div className={`rounded-lg p-3 border ${getScoreBgColor(selectedRecommendation.sentiment_score || 50)}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <MessageCircle className="w-4 h-4 text-slate-500" />
+                      <span className="text-sm text-slate-600">التحليل المعنوي</span>
+                    </div>
+                    <div className={`text-xl font-bold ${getScoreColor(selectedRecommendation.sentiment_score || 50)}`}>
+                      {(selectedRecommendation.sentiment_score || 50).toFixed(0)}%
+                    </div>
+                    <Progress value={selectedRecommendation.sentiment_score || 50} className="h-1.5 mt-2" />
+                  </div>
                 </div>
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-slate-600">التحليل الأساسي</span>
-                    <span className="font-bold text-slate-800">{selectedRecommendation.fundamental_score.toFixed(0)}%</span>
+
+                {/* Technical Sub-scores */}
+                <div className="bg-slate-50 rounded-lg p-3 mb-3">
+                  <h5 className="text-sm font-medium text-slate-700 mb-2">📈 مكونات التحليل الفني</h5>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    <div className="bg-white rounded p-2">
+                      <span className="text-xs text-slate-500">Volume Profile</span>
+                      <div className="font-semibold">{(selectedRecommendation.volume_profile_score || 50).toFixed(0)}%</div>
+                    </div>
+                    <div className="bg-white rounded p-2">
+                      <span className="text-xs text-slate-500">Order Flow</span>
+                      <div className="font-semibold">{(selectedRecommendation.order_flow_score || 50).toFixed(0)}%</div>
+                    </div>
+                    <div className="bg-white rounded p-2">
+                      <span className="text-xs text-slate-500">Volatility</span>
+                      <div className="font-semibold">{(selectedRecommendation.volatility_score || 50).toFixed(0)}%</div>
+                    </div>
+                    <div className="bg-white rounded p-2">
+                      <span className="text-xs text-slate-500">Trend</span>
+                      <div className="font-semibold">{(selectedRecommendation.trend_score || 50).toFixed(0)}%</div>
+                    </div>
+                    <div className="bg-white rounded p-2">
+                      <span className="text-xs text-slate-500">Momentum</span>
+                      <div className="font-semibold">{(selectedRecommendation.momentum_score || 50).toFixed(0)}%</div>
+                    </div>
                   </div>
-                  <Progress value={selectedRecommendation.fundamental_score} className="h-2" />
+                </div>
+
+                {/* Fundamental Sub-scores */}
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <h5 className="text-sm font-medium text-slate-700 mb-2">📊 مكونات التحليل الأساسي</h5>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    <div className="bg-white rounded p-2">
+                      <span className="text-xs text-slate-500">P/E Score</span>
+                      <div className="font-semibold">{(selectedRecommendation.pe_score || 50).toFixed(0)}%</div>
+                    </div>
+                    <div className="bg-white rounded p-2">
+                      <span className="text-xs text-slate-500">P/B Score</span>
+                      <div className="font-semibold">{(selectedRecommendation.pb_score || 50).toFixed(0)}%</div>
+                    </div>
+                    <div className="bg-white rounded p-2">
+                      <span className="text-xs text-slate-500">ROA</span>
+                      <div className="font-semibold">{(selectedRecommendation.roa_score || 50).toFixed(0)}%</div>
+                    </div>
+                    <div className="bg-white rounded p-2">
+                      <span className="text-xs text-slate-500">ROE</span>
+                      <div className="font-semibold">{(selectedRecommendation.roe_score || 50).toFixed(0)}%</div>
+                    </div>
+                    <div className="bg-white rounded p-2">
+                      <span className="text-xs text-slate-500">التوزيعات</span>
+                      <div className="font-semibold">{(selectedRecommendation.dividend_score || 50).toFixed(0)}%</div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Price Levels */}
               <div className="mb-6">
-                <h4 className="font-semibold text-slate-700 mb-3">مستويات السعر</h4>
-                <div className="grid grid-cols-2 gap-3">
+                <h4 className="font-semibold text-slate-700 mb-3">💰 مستويات السعر</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
                     <div className="text-xs text-blue-600 mb-1">سعر الدخول</div>
                     <div className="text-lg font-bold text-blue-700">{formatPrice(selectedRecommendation.entry_price)}</div>
@@ -1543,7 +2006,7 @@ export default function Home() {
                     <div className="text-xs text-green-600 mb-1">الهدف الثاني</div>
                     <div className="text-lg font-bold text-green-700">{formatPrice(selectedRecommendation.take_profit_2)}</div>
                   </div>
-                  <div className="bg-green-50 rounded-lg p-3 border border-green-200 col-span-2">
+                  <div className="bg-green-50 rounded-lg p-3 border border-green-200 col-span-2 md:col-span-1">
                     <div className="text-xs text-green-600 mb-1">الهدف الثالث</div>
                     <div className="text-lg font-bold text-green-700">{formatPrice(selectedRecommendation.take_profit_3)}</div>
                   </div>
@@ -1552,8 +2015,8 @@ export default function Home() {
 
               {/* Risk Management */}
               <div className="mb-6">
-                <h4 className="font-semibold text-slate-700 mb-3">إدارة المخاطر</h4>
-                <div className="bg-slate-50 rounded-lg p-3 grid grid-cols-2 gap-4">
+                <h4 className="font-semibold text-slate-700 mb-3">🛡️ إدارة المخاطر</h4>
+                <div className="bg-slate-50 rounded-lg p-3 grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <span className="text-xs text-slate-500">حجم المركز المقترح</span>
                     <div className="font-semibold text-slate-800">{selectedRecommendation.position_size_percent.toFixed(1)}%</div>
@@ -1589,7 +2052,7 @@ export default function Home() {
               {/* Signals */}
               {selectedRecommendation.signals.length > 0 && (
                 <div className="mb-6">
-                  <h4 className="font-semibold text-slate-700 mb-3">إشارات إيجابية</h4>
+                  <h4 className="font-semibold text-slate-700 mb-3">✅ إشارات إيجابية</h4>
                   <div className="flex flex-wrap gap-2">
                     {selectedRecommendation.signals.map((signal, i) => (
                       <Badge key={i} variant="outline" className="bg-green-50 text-green-700 border-green-200">
@@ -1603,7 +2066,7 @@ export default function Home() {
               {/* Warnings */}
               {selectedRecommendation.warnings.length > 0 && (
                 <div className="mb-6">
-                  <h4 className="font-semibold text-slate-700 mb-3">تحذيرات</h4>
+                  <h4 className="font-semibold text-slate-700 mb-3">⚠️ تحذيرات</h4>
                   <div className="flex flex-wrap gap-2">
                     {selectedRecommendation.warnings.map((warning, i) => (
                       <Badge key={i} variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
@@ -1616,7 +2079,7 @@ export default function Home() {
 
               {/* Reason */}
               <div className="bg-primary/5 rounded-lg p-4 border border-primary/20">
-                <h4 className="font-semibold text-slate-700 mb-2">السبب</h4>
+                <h4 className="font-semibold text-slate-700 mb-2">📝 السبب</h4>
                 <p className="text-slate-600">{selectedRecommendation.reason}</p>
               </div>
             </CardContent>
